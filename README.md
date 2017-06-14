@@ -56,7 +56,7 @@ func main() {
 
 - Indexes.
 - All range queries are sorted (ascending by default).
-- Uses [MessagePack](gopkg.in/vmihailenco/msgpack.v2) as underlying storage structure.
+- Uses [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
 - All range queries are buffered in the background, 100 results at a time.
 - Supports filtering.
 - Lockless read/writes. Achieve safe updates with `Update` and counters.

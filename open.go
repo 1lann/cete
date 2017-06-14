@@ -31,8 +31,10 @@ func (db *DB) newKV(names ...Name) (*badger.KV, error) {
 
 	dir += "/data"
 
-	if err := os.MkdirAll(dir, 0744); err != nil {
-		return nil, err
+	if found, _ := exists(dir); !found {
+		if err := os.MkdirAll(dir, 0744); err != nil {
+			return nil, err
+		}
 	}
 
 	opts := badger.DefaultOptions
@@ -110,6 +112,8 @@ func (db *DB) writeConfig() error {
 	if err != nil {
 		return err
 	}
+
+	defer file.Close()
 
 	return msgpack.NewEncoder(file).Encode(db.config)
 }

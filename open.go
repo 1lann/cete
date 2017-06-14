@@ -22,8 +22,8 @@ type dbConfig struct {
 	Tables []tableConfig
 }
 
-func (db *DB) newKV(names ...Name) (*badger.KV, error) {
-	dir := db.path
+func (d *DB) newKV(names ...Name) (*badger.KV, error) {
+	dir := d.path
 
 	for _, name := range names {
 		dir += "/" + name.Hex()
@@ -107,13 +107,13 @@ func Open(path string) (*DB, error) {
 	return db, nil
 }
 
-func (db *DB) writeConfig() error {
-	file, err := os.Create(db.path + "/config.dat")
+func (d *DB) writeConfig() error {
+	file, err := os.Create(d.path + "/config.dat")
 	if err != nil {
 		return err
 	}
 
 	defer file.Close()
 
-	return msgpack.NewEncoder(file).Encode(db.config)
+	return msgpack.NewEncoder(file).Encode(d.config)
 }

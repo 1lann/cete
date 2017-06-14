@@ -12,34 +12,34 @@ import (
 )
 
 // NewTable creates a new table in the database.
-func (db *DB) NewTable(name string) error {
+func (d *DB) NewTable(name string) error {
 	if name == "" || len(name) > 125 {
 		return ErrBadIdentifier
 	}
 
-	db.configMutex.Lock()
-	defer db.configMutex.Unlock()
+	d.configMutex.Lock()
+	defer d.configMutex.Unlock()
 
-	for _, table := range db.config.Tables {
+	for _, table := range d.config.Tables {
 		if table.TableName == name {
 			return ErrAlreadyExists
 		}
 	}
 
-	kv, err := db.newKV(Name(name))
+	kv, err := d.newKV(Name(name))
 	if err != nil {
 		return err
 	}
 
-	db.config.Tables = append(db.config.Tables, tableConfig{TableName: name})
-	if err := db.writeConfig(); err != nil {
+	d.config.Tables = append(d.config.Tables, tableConfig{TableName: name})
+	if err := d.writeConfig(); err != nil {
 		return err
 	}
 
-	db.tables[Name(name)] = &Table{
+	d.tables[Name(name)] = &Table{
 		indexes: make(map[Name]*Index),
 		data:    kv,
-		db:      db,
+		db:      d,
 	}
 
 	return nil

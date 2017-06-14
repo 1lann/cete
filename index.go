@@ -9,13 +9,13 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
-// The bounds type are for variables which represent a bound for Between.
+// Bounds is the type for variables which represent a bound for Between.
 type Bounds int
 
 // Valid bounds.
 var (
-	MinBounds Bounds = 0
-	MaxBounds Bounds = 1
+	MinBounds Bounds = 1
+	MaxBounds Bounds = 2
 )
 
 // NewIndex creates a new index on the table, using the name as the Query.
@@ -178,9 +178,14 @@ func (i *Index) GetAll(key interface{}) (*Range, error) {
 	}, func() {}), nil
 }
 
-// Between returns all the values whose index key is within the specified
-// bounds. The bounds are inclusive on both ends. It is possible to have
+// Between returns a Range of documents between the lower and upper index values
+// provided. The range will be sorted in ascending order by index value. You can
+// reverse the sorting by specifying true to the optional reverse parameter.
+// The bounds are inclusive on both ends. It is possible to have
 // duplicate documents if the same document has multiple unique index values.
+//
+// You can use cete.MinBounds and cete.MaxBounds to specify minimum and maximum
+// bound values.
 func (i *Index) Between(lower interface{}, upper interface{},
 	reverse ...bool) *Range {
 	shouldReverse := (len(reverse) > 0) && reverse[0]

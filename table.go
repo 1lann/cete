@@ -100,7 +100,7 @@ func (t *Table) Get(key string, dst interface{}) (int, error) {
 	return int(item.Counter()), msgpack.Unmarshal(item.Value(), dst)
 }
 
-// Set sets a value in the table, an optional counter value can be provided
+// Set sets a value in the table. An optional counter value can be provided
 // to only set the value if the counter value is the same.
 func (t *Table) Set(key string, value interface{}, counter ...int) error {
 	var item badger.KVItem
@@ -340,6 +340,8 @@ func (i *Index) name() string {
 	return i.table.name() + "/__unknown_index"
 }
 
+// Delete deletes the key from the table. An optional counter value can be
+// provided to only delete the document if the counter value is the same.
 func (t *Table) Delete(key string, counter ...int) error {
 	var item badger.KVItem
 	err := t.data.Get([]byte(key), &item)
@@ -374,10 +376,23 @@ func (t *Table) Delete(key string, counter ...int) error {
 	return nil
 }
 
+// Index returns the index object of an index of the table. If the index does
+// not exist, nil is returned.
 func (t *Table) Index(index string) *Index {
 	return t.indexes[Name(index)]
 }
 
+// Update updates a document in the table with the given modifier function.
+// The modifier function should take in 1 argument, the variable to decode
+// the current document value into. The modifier function should return 2
+// values, the new value to set the document to, and an error which determines
+// whether or not the update should be aborted, and will be returned back from
+// Update.
+//
+// The modifier function will be continuously called until the counter at the
+// beginning of handler matches the counter when the document is updated.
+// This allows for safe updates on a single document, such as incrementing a
+// value.
 func (t *Table) Update(key string, handler interface{}) error {
 	handlerType := reflect.TypeOf(handler)
 	if handlerType.Kind() != reflect.Func {
@@ -428,6 +443,13 @@ func (t *Table) name() string {
 	return "__unknown_table"
 }
 
+// Between returns a Range of documents between the lower and upper key values
+// provided. The range will be sorted in ascending order by key. You can
+// reverse the sorting by specifying true to the optional reverse parameter.
+// The bounds are inclusive on both ends.
+//
+// You can use cete.MinBounds and cete.MaxBounds to specify minimum and maximum
+// bound values.
 func (t *Table) Between(lower interface{}, upper interface{},
 	reverse ...bool) *Range {
 	shouldReverse := (len(reverse) > 0) && reverse[0]
@@ -480,6 +502,8 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	}, it.Close)
 }
 
+// All returns all the documents in the table. It is shorthand
+// for Between(MinBounds, MaxBounds, reverse...)
 func (t *Table) All(reverse ...bool) *Range {
 	return t.Between(MinBounds, MaxBounds, reverse...)
 }

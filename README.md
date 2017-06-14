@@ -5,7 +5,7 @@
 
 >**Cete**
 >_noun_
-
+>
 >A group of badgers.
 
 Cete is a simple, lightweight abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. It's great for cases where you need a fast, on-disk, embedded database.

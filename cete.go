@@ -26,32 +26,33 @@ var (
 	ErrIndexError     = errors.New("cete: index error")
 )
 
+// Name represents a table or index identifier.
 type Name string
 
+// Hex returns the hexadecimal representation of the name.
 func (n Name) Hex() string {
 	return hex.EncodeToString([]byte(n))
 }
 
+// Index represents an index of a table.
 type Index struct {
 	index *badger.KV
 	table *Table
 }
 
+// Table represents a table in the database.
 type Table struct {
 	indexes map[Name]*Index
 	data    *badger.KV
 	db      *DB
 }
 
+// DB represents the database.
 type DB struct {
 	path        string
 	tables      map[Name]*Table
 	config      dbConfig
 	configMutex *sync.Mutex
-}
-
-func (d *DB) Table(tableName string) *Table {
-	return d.tables[Name(tableName)]
 }
 
 func exists(path string) (bool, error) {
@@ -121,33 +122,41 @@ func valueToBytes(value interface{}) []byte {
 	panic(fmt.Sprintf("cete: unsupported value: %v", value))
 }
 
+// Document represents the value of a document.
 type Document []byte
 
+// QueryInt returns the int value of a QueryOne assumed to contain an int.
 func (v Document) QueryInt(query string) int {
 	return int(v.QueryOne(query).(uint64))
 }
 
+// QueryInt64 returns the int64 value of a QueryOne assumed to contain an int64.
 func (v Document) QueryInt64(query string) int64 {
 	return int64(v.QueryOne(query).(uint64))
 }
 
+// QueryFloat64 returns the float64 value of a QueryOne assumed to contain a float64.
 func (v Document) QueryFloat64(query string) float64 {
 	return v.QueryOne(query).(float64)
 }
 
+// QueryString returns the string value of a QueryOne assumed to contain a string.
 func (v Document) QueryString(query string) string {
 	return v.QueryOne(query).(string)
 }
 
+// QueryBytes returns the []byte value of a QueryOne assumed to contain a []byte.
 func (v Document) QueryBytes(query string) []byte {
 	return v.QueryOne(query).([]byte)
 }
 
+// QueryTime returns the time.Time value of a QueryOne assumed to contain a time.Time.
 func (v Document) QueryTime(query string) time.Time {
 	t := v.QueryOne(query).([]interface{})
 	return time.Unix(int64(t[0].(uint64)), int64(t[1].(uint64)))
 }
 
+// QueryOne returns the first matching value of a msgpack query.
 func (v Document) QueryOne(query string) interface{} {
 	results, err := msgpack.NewDecoder(bytes.NewReader([]byte(v))).Query(query)
 	if err != nil || len(results) == 0 {
@@ -157,6 +166,7 @@ func (v Document) QueryOne(query string) interface{} {
 	return results[0]
 }
 
+// Decode attempts to decodes the document to an interface using reflection.
 func (v Document) Decode(dst interface{}) error {
 	return msgpack.Unmarshal([]byte(v), dst)
 }

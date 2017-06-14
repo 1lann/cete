@@ -19,3 +19,9 @@ func (d *DB) Tables() []string {
 
 	return tables
 }
+
+// Table returns the table with the given name. If the table does not exist,
+// nil is returned.
+func (d *DB) Table(tableName string) *Table {
+	return d.tables[Name(tableName)]
+}

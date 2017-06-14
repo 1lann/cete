@@ -14,7 +14,7 @@ Cete is a simple, lightweight abstraction layer of [Badger](https://github.com/d
 
 **This is just a personal hobby project, I may not maintain this! I just wanted to make my own database for fun.**
 
-Here's a short example to show how easy to use the database is:
+Here's a short example to show how easy it is to use the database:
 
 ```go
 package main
@@ -30,7 +30,7 @@ type Person struct {
 }
 
 func main() {
-	db, _ := cete.OpenDatabase("./cete_data")
+	db, _ := cete.Open("./cete_data")
 
 	defer db.Close()
 
@@ -91,7 +91,7 @@ type Person struct {
 }
 
 func main() {
-	db, _ := cete.OpenDatabase("./cete_data")
+	db, _ := cete.Open("./cete_data")
 
 	defer db.Close()
 
@@ -137,7 +137,7 @@ type Person struct {
 }
 
 func main() {
-	db, _ := cete.OpenDatabase("./cete_data")
+	db, _ := cete.Open("./cete_data")
 
 	defer db.Close()
 

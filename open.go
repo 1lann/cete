@@ -45,7 +45,7 @@ func (db *DB) newKV(names ...Name) (*badger.KV, error) {
 
 // OpenDatabase opens the database at the provided path. It will create a new
 // database if the folder does not exist.
-func OpenDatabase(path string) (*DB, error) {
+func Open(path string) (*DB, error) {
 	db := &DB{
 		path:        path,
 		tables:      make(map[Name]*Table),

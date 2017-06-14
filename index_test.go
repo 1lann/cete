@@ -53,7 +53,7 @@ func TestPostIndex(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestPreIndex(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestIndexDrop(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +495,7 @@ func TestIndexBetween(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,7 +667,7 @@ func TestIndexSet(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -884,7 +884,7 @@ func TestIndexLoading(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -920,7 +920,7 @@ func TestIndexLoading(t *testing.T) {
 
 	db.Close()
 
-	db, err = OpenDatabase(dir + "/data")
+	db, err = Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -950,7 +950,7 @@ func TestIndexLoading(t *testing.T) {
 
 	db.Close()
 
-	db, err = OpenDatabase(dir + "/data")
+	db, err = Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1001,7 +1001,7 @@ func TestIndexDelete(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}

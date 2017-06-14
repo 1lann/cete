@@ -55,7 +55,7 @@ func TestTableBetween(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestTableLoading(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestTableLoading(t *testing.T) {
 
 	db.Close()
 
-	db, err = OpenDatabase(dir + "/data")
+	db, err = Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestTableLoading(t *testing.T) {
 
 	db.Close()
 
-	db, err = OpenDatabase(dir + "/data")
+	db, err = Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func TestTableCounter(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}

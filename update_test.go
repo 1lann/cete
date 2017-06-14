@@ -39,7 +39,7 @@ func TestUpdate(t *testing.T) {
 		}
 	}()
 
-	db, err := OpenDatabase(dir + "/data")
+	db, err := Open(dir + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -139,14 +139,14 @@ func (t *Table) Set(key string, value interface{}, counter ...int) error {
 	return nil
 }
 
-func (t *Table) updateIndex(key string, old, new []byte) error {
-	type entry struct {
-		indexName string
-		indexKey  []byte
-	}
+type diffEntry struct {
+	indexName string
+	indexKey  []byte
+}
 
-	var removals []entry
-	var additions []entry
+func (t *Table) diffIndexes(old, new []byte) ([]diffEntry, []diffEntry) {
+	var removals []diffEntry
+	var additions []diffEntry
 
 	for indexName := range t.indexes {
 		oldRawValues, _ := msgpack.NewDecoder(bytes.NewReader(old)).
@@ -183,7 +183,7 @@ func (t *Table) updateIndex(key string, old, new []byte) error {
 			}
 
 			if !found {
-				additions = append(additions, entry{string(indexName), newValue})
+				additions = append(additions, diffEntry{string(indexName), newValue})
 			}
 		}
 
@@ -197,10 +197,16 @@ func (t *Table) updateIndex(key string, old, new []byte) error {
 			}
 
 			if !found {
-				removals = append(removals, entry{string(indexName), oldValue})
+				removals = append(removals, diffEntry{string(indexName), oldValue})
 			}
 		}
 	}
+
+	return additions, removals
+}
+
+func (t *Table) updateIndex(key string, old, new []byte) error {
+	additions, removals := t.diffIndexes(old, new)
 
 	var lastError error
 

@@ -68,15 +68,26 @@ func (t *Table) NewIndex(name string) error {
 
 	t.db.configMutex.Unlock()
 
-	r := t.Between(MinBounds, MaxBounds)
-
 	idx := &Index{
 		index: kv,
 		table: t,
 	}
 
+	if err = idx.fill(name); err != nil {
+		return err
+	}
+
+	t.indexes[Name(name)] = idx
+
+	return nil
+}
+
+func (i *Index) fill(name string) error {
+	r := i.table.Between(MinBounds, MaxBounds)
+
 	var entry bufferEntry
 	var results []interface{}
+	var err error
 
 	for {
 		entry = <-r.buffer
@@ -94,14 +105,12 @@ func (t *Table) NewIndex(name string) error {
 		}
 
 		for _, result := range results {
-			err = idx.addToIndex(valueToBytes(result), entry.key)
+			err = i.addToIndex(valueToBytes(result), entry.key)
 			if err != nil {
 				log.Println("cete: index error for index \""+name+"\":", err)
 			}
 		}
 	}
-
-	t.indexes[Name(name)] = idx
 
 	return nil
 }
@@ -186,7 +195,7 @@ func (i *Index) GetAll(key interface{}) (*Range, error) {
 //
 // You can use cete.MinBounds and cete.MaxBounds to specify minimum and maximum
 // bound values.
-func (i *Index) Between(lower interface{}, upper interface{},
+func (i *Index) Between(lower, upper interface{},
 	reverse ...bool) *Range {
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
@@ -212,10 +221,26 @@ func (i *Index) Between(lower interface{}, upper interface{},
 		}
 	}
 
-	var entry bufferEntry
 	var lastRange *Range
 
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(i.betweenNext(it, lastRange, shouldReverse, lower, upper),
+		func() {
+			if lastRange != nil {
+				lastRange.Close()
+			}
+			it.Close()
+		})
+}
+
+func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
+	shouldReverse bool, lower,
+	upper interface{}) func() (string, []byte, int, error) {
+	upperBytes := valueToBytes(upper)
+	lowerBytes := valueToBytes(lower)
+
+	var entry bufferEntry
+
+	return func() (string, []byte, int, error) {
 		if lastRange != nil {
 			entry = <-lastRange.buffer
 			if entry.err != ErrEndOfRange {
@@ -251,12 +276,7 @@ func (i *Index) Between(lower interface{}, upper interface{},
 		}
 
 		return "", nil, 0, ErrEndOfRange
-	}, func() {
-		if lastRange != nil {
-			lastRange.Close()
-		}
-		it.Close()
-	})
+	}
 }
 
 // All returns all the documents which have an index value. It is shorthand

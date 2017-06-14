@@ -69,6 +69,18 @@ func main() {
 
 Find documentation on [GoDoc](https://godoc.org/github.com/1lann/cete).
 
+## Performance
+
+I've performed some benchmarks comparing Cete to two other pure Go database wrappers, [Storm](https://github.com/asdine/storm) and [BoltHold](https://github.com/timshannon/bolthold). The source code for this benchmark can be found [here](https://github.com/1lann/db-benchmark).
+
+For this test, Storm was running in batched write modes.
+
+These benchmarks consists of simple sets and gets. However the gets were by secondary index instead of primary index, as is in a lot of real-world cases. If it were all by primary index, it will be more of a performance indicator of the underlying key-value store.
+
+![Cete benchmarks](https://chuie.io/cete.png)
+
+Cete is typically twice as fast as Storm for concurrent operations, and BoltHold was magnitudes slower than either. Cete is actually quite slow when it comes to sequential write operations (and isn't shown here), so it's strongly recommended to write concurrently. Cete also fairs similarly to Storm with sequential reads.
+
 ## Examples
 
 The following examples don't handle errors for the sake of example. It is strongly recommended to handle errors as the library will not print out when errors occur (unless it detects a corrupt index).
@@ -173,7 +185,7 @@ No, this library is meant to be a very simple and basic abstraction layer of Bad
 
 For single document updates (such as incrementing a value), you can use the `Update` method which constantly re-attempts the update until the counter matches, eradicating race conditions. Alternatively you can use the counter yourself and implement the logic to handle unmatched counters.
 
-For more complex transactions, you'll need to implement your own solution. Although typically if you need more complex transactions you would be willing to sacrifice performance for an ACID compliant database.
+For more complex transactions, you'll need to implement your own solution. Although typically if you need more complex transactions you would be willing to sacrifice performance for an ACID compliant database. That being said if you need ACID compliance, I recommend you to use one of the great BoltDB wrappers that are available, such as [Storm](https://github.com/asdine/storm).
 
 If you're desperate to use transactions with Cete, you can implement your own 2 phase commits.
 

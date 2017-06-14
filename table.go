@@ -173,36 +173,34 @@ func (t *Table) diffIndexes(old, new []byte) ([]diffEntry, []diffEntry) {
 			newValues[i] = valueToBytes(newRawValue)
 		}
 
-		for _, newValue := range newValues {
-			found := false
-			for _, oldValue := range oldValues {
-				if bytes.Equal(newValue, oldValue) {
-					found = true
-					break
-				}
-			}
+		additions = append(additions, getOneWayDiffs(string(indexName),
+			newValues, oldValues)...)
 
-			if !found {
-				additions = append(additions, diffEntry{string(indexName), newValue})
-			}
-		}
-
-		for _, oldValue := range oldValues {
-			found := false
-			for _, newValue := range newValues {
-				if bytes.Equal(newValue, oldValue) {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				removals = append(removals, diffEntry{string(indexName), oldValue})
-			}
-		}
+		removals = append(removals, getOneWayDiffs(string(indexName),
+			oldValues, newValues)...)
 	}
 
 	return additions, removals
+}
+
+func getOneWayDiffs(indexName string, a, b [][]byte) []diffEntry {
+	var results []diffEntry
+
+	for _, aa := range a {
+		found := false
+		for _, bb := range b {
+			if bytes.Equal(bb, aa) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			results = append(results, diffEntry{indexName, aa})
+		}
+	}
+
+	return results
 }
 
 func (t *Table) updateIndex(key string, old, new []byte) error {

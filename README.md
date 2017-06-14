@@ -2,6 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/1lann/cete)](https://goreportcard.com/report/github.com/1lann/cete)
 [![GoDoc](https://godoc.org/github.com/1lann/cete?status.svg)](https://godoc.org/github.com/1lann/cete)
+[![codecov](https://codecov.io/gh/1lann/cete/branch/master/graph/badge.svg)](https://codecov.io/gh/1lann/cete)
 [![Travis CI](https://travis-ci.org/1lann/cete.svg?branch=master)](https://travis-ci.org/1lann/cete)
 
 >**Cete**
@@ -9,7 +10,7 @@
 >
 >A group of badgers.
 
-Cete is a simple, lightweight abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. It's great for cases where you need a fast, on-disk, embedded database.
+Cete is a simple, lightweight abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
 **This is just a personal hobby project, I may not maintain this! I just wanted to make my own database for fun.**
 
@@ -63,6 +64,10 @@ func main() {
 - Thread safe.
 - Pure Go.
 - Uses the fastest pure Go key-value store in the world 😉.
+
+## Documentation
+
+Find documentation on [GoDoc](https://godoc.org/github.com/1lann/cete).
 
 ## Examples
 

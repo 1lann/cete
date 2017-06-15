@@ -10,7 +10,7 @@
 >
 >A group of badgers.
 
-Cete is a simple, lightweight abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
+Cete is a simple, lightweight database abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
 **This is just a personal hobby project, I may not maintain this! I just wanted to make my own database for fun.**
 

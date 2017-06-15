@@ -35,9 +35,7 @@ func TestFilter(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -47,33 +45,23 @@ func TestFilter(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer func() {
 		db.Close()
 	}()
 
 	err = db.NewTable("filter_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("filter_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	r := db.Table("filter_testing").All().Filter(func(doc Document) bool {
 		return doc.QueryInt("Age") > 17
 	})
-
-	defer func() {
-		r.Close()
-	}()
 
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
@@ -84,7 +72,9 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
 		return doc.QueryFloat64("Height") > 1.75
@@ -109,4 +99,43 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
+	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
+		return doc.QueryFloat64("Height") > 1.75
+	})
+
+	n, err := r.Count()
+	panicNotNil(err)
+	if n != 2 {
+		t.Fatal("count should be 2, but isn't")
+	}
+
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
+		return doc.QueryFloat64("Height") > 1.75
+	})
+
+	err = r.Skip(2)
+	panicNotNil(err)
+
+	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
+		return doc.QueryFloat64("Height") > 1.75
+	})
+
+	err = r.Skip(1)
+	panicNotNil(err)
+
+	expectPerson("jason", r, people["jason"])
+
+	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
+		return doc.QueryFloat64("Height") > 1.75
+	})
+
+	err = r.Skip(3)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
 }

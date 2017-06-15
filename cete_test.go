@@ -11,13 +11,17 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+func panicNotNil(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func TestBasic(t *testing.T) {
 	t.Parallel()
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -27,23 +31,19 @@ func TestBasic(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Table("does not exist") != nil {
-		t.Fatal(err)
+		t.Fatal("table should not exist, but does")
 	}
 
 	if db.Table("testing") == nil {
-		t.Fatal("testing should exist but it doesn't")
+		t.Fatal("testing should exist but, it doesn't")
 	}
 
 	db.Table("testing").Set("bob", "hello")
@@ -55,18 +55,14 @@ func TestBasic(t *testing.T) {
 
 	var result string
 	_, err = db.Table("testing").Get("bob", &result)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if result != "hello" {
 		t.Fatal("result should be hello, but isn't")
 	}
 
 	err = db.Table("testing").Delete("bob")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, err = db.Table("testing").Get("bob", &result)
 	if err != ErrNotFound {
@@ -74,9 +70,7 @@ func TestBasic(t *testing.T) {
 	}
 
 	err = db.Table("testing").Drop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Table("testing") != nil {
 		t.Fatal("testing should be nil, but isn't")
@@ -85,7 +79,5 @@ func TestBasic(t *testing.T) {
 	db.Close()
 
 	db, err = Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 }

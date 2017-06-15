@@ -9,9 +9,7 @@ import (
 func expectPerson(key string, r *Range, person Person) {
 	var nextPerson Person
 	nextKey, _, err := r.Next(&nextPerson)
-	if err != nil {
-		panic(err)
-	}
+	panicNotNil(err)
 
 	if nextKey != key {
 		panic("key should be " + key + ", but isn't")
@@ -44,9 +42,7 @@ func TestTableBetween(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -56,28 +52,17 @@ func TestTableBetween(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer db.Close()
+	panicNotNil(err)
 
 	err = db.NewTable("table_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("table_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	r := db.Table("table_testing").Between(MinBounds, MaxBounds)
-	defer func() {
-		r.Close()
-	}()
 
 	var person Person
 
@@ -90,7 +75,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between(MinBounds, MaxBounds, true)
 
@@ -103,7 +90,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("draw", "drfw", true)
 
@@ -114,7 +103,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("drgw", "drfw", true)
 
@@ -123,7 +114,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("jason", "draw")
 
@@ -132,7 +125,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("draw", "jason", true)
 
@@ -144,7 +139,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("a", "draw")
 
@@ -155,7 +152,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("a", "ivan")
 
@@ -167,7 +166,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("ivan", "a", true)
 
@@ -176,7 +177,9 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("table_testing").Between("a", "ivan", true)
 
@@ -211,9 +214,7 @@ func TestTableLoading(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -223,18 +224,14 @@ func TestTableLoading(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer func() {
 		db.Close()
 	}()
 
 	err = db.NewTable("table_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Tables()[0] != "table_testing" {
 		t.Fatal("Tables should return index_testing, but it didn't")
@@ -242,17 +239,13 @@ func TestTableLoading(t *testing.T) {
 
 	for name, person := range people {
 		err = db.Table("table_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	db.Close()
 
 	db, err = Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Tables()[0] != "table_testing" {
 		t.Fatal("Tables should return index_testing, but it didn't")
@@ -264,18 +257,14 @@ func TestTableLoading(t *testing.T) {
 
 	var person Person
 	_, err = db.Table("table_testing").Get("jason", &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if !person.IsSame(people["jason"]) {
 		t.Fatal("person should be same as jason, but isn't")
 	}
 
 	err = db.Table("table_testing").Drop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if len(db.Tables()) != 0 {
 		t.Fatal("Tables should be empty, but isn't")
@@ -288,9 +277,7 @@ func TestTableLoading(t *testing.T) {
 	db.Close()
 
 	db, err = Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if len(db.Tables()) != 0 {
 		t.Fatal("Tables should be empty, but isn't")
@@ -323,9 +310,7 @@ func TestTableCounter(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -335,46 +320,34 @@ func TestTableCounter(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer func() {
 		db.Close()
 	}()
 
 	err = db.NewTable("table_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("table_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	var person Person
 	counter, err := db.Table("table_testing").Get("jason", &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("table_testing").Set("jason", people["ben"], counter+1)
 	if err != ErrCounterChanged {
-		t.Fatal(err)
+		t.Fatal("error should be ErrCounterChanged, but isn't")
 	}
 
 	err = db.Table("table_testing").Set("jason", people["ben"], counter)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	counter, err = db.Table("table_testing").Get("jason", &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if !person.IsSame(people["ben"]) {
 		t.Fatal("person should be same as ben, but isn't")
@@ -386,14 +359,10 @@ func TestTableCounter(t *testing.T) {
 	}
 
 	err = db.Table("table_testing").Set("jason", people["ben"])
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	newCounter, err := db.Table("table_testing").Get("jason", &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("table_testing").Delete("jason", counter)
 	if err != ErrCounterChanged {
@@ -401,9 +370,7 @@ func TestTableCounter(t *testing.T) {
 	}
 
 	err = db.Table("table_testing").Delete("jason", newCounter)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, err = db.Table("table_testing").Get("jason", &person)
 	if err != ErrNotFound {

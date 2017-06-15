@@ -1,6 +1,10 @@
 package cete
 
-import "gopkg.in/vmihailenco/msgpack.v2"
+import (
+	"sync/atomic"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
+)
 
 const bufferSize = 100
 
@@ -17,13 +21,18 @@ type Range struct {
 	buffer chan bufferEntry
 	next   func() (string, []byte, int, error)
 	close  func()
+	closed int32
 }
 
 // Next stores the next item in the range into dst. dst must be a pointer
 // to a value, or nil. If dst is nil then the value will be discarded, but
 // the counter and key will still be returned.
 func (r *Range) Next(dst interface{}) (string, int, error) {
-	entry := <-r.buffer
+	entry, more := <-r.buffer
+	if !more {
+		return "", 0, ErrEndOfRange
+	}
+
 	if entry.err != nil {
 		return entry.key, entry.counter, entry.err
 	}
@@ -35,25 +44,31 @@ func (r *Range) Next(dst interface{}) (string, int, error) {
 	return entry.key, entry.counter, nil
 }
 
-// Close closes the range. You must always call Close when you're finished
-// with the range. When the range reaches its bounds, it does not automatically
-// close.
+// Close closes the range. The range will automatically close upon the
+// first encountered error.
 func (r *Range) Close() {
-	r.close()
+	if atomic.CompareAndSwapInt32(&r.closed, 0, 1) {
+		r.close()
+	}
 }
 
-func newRange(next func() (string, []byte, int, error), close func()) *Range {
+func newRange(next func() (string, []byte, int, error), closer func()) *Range {
 	r := &Range{
 		buffer: make(chan bufferEntry, bufferSize),
 		next:   next,
-		close:  close,
+		close:  closer,
 	}
 
 	go func() {
 		for {
 			key, data, counter, err := r.next()
+			// r.Close before sending to channel to prevent race condition
+			if err != nil {
+				r.Close()
+			}
 			r.buffer <- bufferEntry{key, data, counter, err}
 			if err != nil {
+				close(r.buffer)
 				return
 			}
 		}
@@ -96,9 +111,10 @@ func (r *Range) Skip(n int) error {
 	return nil
 }
 
-// Count will count the number of elements in the range. If it reaches the
-// end of the range, it will return the count with a nil error. If a non-nil
-// error is encountered, it returns the current count and the error.
+// Count will count the number of elements in the range and consume the values
+// in the range. If it reaches the end of the range, it will return the count
+// with a nil error. If a non-nil error is encountered, it returns the
+// current count and the error.
 func (r *Range) Count() (int64, error) {
 	var count int64
 	var entry bufferEntry

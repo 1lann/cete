@@ -42,9 +42,7 @@ func TestPostIndex(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -54,34 +52,24 @@ func TestPostIndex(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	var person Person
 	key, _, err := db.Table("index_testing").Index("Age").One(19, &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if key != "ben" {
 		t.Fatal("key should be ben, but isn't")
@@ -100,22 +88,12 @@ func TestPostIndex(t *testing.T) {
 	var b Person
 
 	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		r.Close()
-	}()
+	panicNotNil(err)
 
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -134,17 +112,15 @@ func TestPostIndex(t *testing.T) {
 	a = Person{}
 	b = Person{}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -183,9 +159,7 @@ func TestPreIndex(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -195,34 +169,24 @@ func TestPreIndex(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	var person Person
 	key, _, err := db.Table("index_testing").Index("Age").One(19, &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if key != "ben" {
 		t.Fatal("key should be ben, but isn't")
@@ -241,22 +205,12 @@ func TestPreIndex(t *testing.T) {
 	var b Person
 
 	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		r.Close()
-	}()
+	panicNotNil(err)
 
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -275,17 +229,15 @@ func TestPreIndex(t *testing.T) {
 	a = Person{}
 	b = Person{}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -324,9 +276,7 @@ func TestIndexDrop(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -336,27 +286,19 @@ func TestIndexDrop(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	err = db.Table("index_testing").NewIndex("Age")
@@ -365,24 +307,18 @@ func TestIndexDrop(t *testing.T) {
 	}
 
 	err = db.Table("index_testing").Index("Age").Drop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Table("index_testing").Index("Age") != nil {
 		t.Fatal("index Age should be nil, but isn't")
 	}
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	var person Person
 	key, _, err := db.Table("index_testing").Index("Age").One(19, &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if key != "ben" {
 		t.Fatal("key should be ben, but isn't")
@@ -401,22 +337,12 @@ func TestIndexDrop(t *testing.T) {
 	var b Person
 
 	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		r.Close()
-	}()
+	panicNotNil(err)
 
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -435,17 +361,15 @@ func TestIndexDrop(t *testing.T) {
 	a = Person{}
 	b = Person{}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
 	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	_, _, err = r.Next(&b)
 	if err != ErrEndOfRange {
@@ -484,9 +408,7 @@ func TestIndexBetween(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -496,33 +418,22 @@ func TestIndexBetween(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	r := db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds)
-	defer func() {
-		r.Close()
-	}()
 
 	var person Person
 
@@ -535,7 +446,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds, true)
 
@@ -548,7 +461,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(14, 16, true)
 
@@ -559,7 +474,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(16, 14, true)
 
@@ -568,7 +485,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(20, 14)
 
@@ -577,7 +496,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(14, 20, true)
 
@@ -589,7 +510,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 14)
 
@@ -600,7 +523,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 17)
 
@@ -612,7 +537,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(17, 1, true)
 
@@ -621,7 +548,9 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 17, true)
 
@@ -656,9 +585,7 @@ func TestIndexSet(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -668,40 +595,27 @@ func TestIndexSet(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer db.Close()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name := range people {
 		err = db.Table("index_testing").Set(name, people["jason"])
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	r := db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds)
-	defer func() {
-		r.Close()
-	}()
 
 	var person Person
 
@@ -714,7 +628,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds, true)
 
@@ -727,7 +643,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(14, 16, true)
 
@@ -738,7 +656,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(16, 14, true)
 
@@ -747,7 +667,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(20, 14)
 
@@ -756,7 +678,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(14, 20, true)
 
@@ -768,7 +692,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 14)
 
@@ -779,7 +705,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 17)
 
@@ -791,7 +719,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(17, 1, true)
 
@@ -800,7 +730,9 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r.Close()
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 
 	r = db.Table("index_testing").Index("Age").Between(1, 17, true)
 
@@ -873,9 +805,7 @@ func TestIndexLoading(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -885,30 +815,22 @@ func TestIndexLoading(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer func() {
 		db.Close()
 	}()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Tables()[0] != "index_testing" {
 		t.Fatal("Tables should return index_testing, but it didn't")
@@ -921,9 +843,7 @@ func TestIndexLoading(t *testing.T) {
 	db.Close()
 
 	db, err = Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Tables()[0] != "index_testing" {
 		t.Fatal("Tables should return index_testing, but it didn't")
@@ -935,25 +855,19 @@ func TestIndexLoading(t *testing.T) {
 
 	var person Person
 	_, _, err = db.Table("index_testing").Index("Age").One(17, &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if !person.IsSame(people["jason"]) {
 		t.Fatal("person should be same as jason, but isn't")
 	}
 
 	err = db.Table("index_testing").Index("Age").Drop()
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	db.Close()
 
 	db, err = Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if db.Tables()[0] != "index_testing" {
 		t.Fatal("Tables should return index_testing, but it didn't")
@@ -990,9 +904,7 @@ func TestIndexDelete(t *testing.T) {
 	}
 
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -1002,30 +914,22 @@ func TestIndexDelete(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	defer func() {
 		db.Close()
 	}()
 
 	err = db.NewTable("index_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
+		panicNotNil(err)
 	}
 
 	err = db.Table("index_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	db.Table("index_testing").Delete("jason")
 
@@ -1045,9 +949,7 @@ func TestIndexDelete(t *testing.T) {
 	db.Table("index_testing").Set("jason", people["jason"])
 
 	_, _, err = db.Table("index_testing").Index("Age").One(17, &person)
-	if err != nil {
-		t.Fatal(err)
-	}
+	panicNotNil(err)
 
 	if !person.IsSame(people["jason"]) {
 		t.Fatal("person should be same as jason, but isn't")

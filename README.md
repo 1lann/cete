@@ -123,8 +123,6 @@ func main() {
 		return doc.QueryInt("Age") >= 13
 	})
 
-	defer r.Close()
-
 	var person Person
 	r.Next(&person)
 	fmt.Printf("%+v\n", person) // Should print Brock's information
@@ -167,8 +165,6 @@ func main() {
 
 	// Find who is no younger than 13. This would also be sorted ascending by age.
 	r := db.Table("people").Index("Age").Between(13, cete.MaxBounds)
-
-	defer r.Close()
 
 	var person Person
 	r.Next(&person)

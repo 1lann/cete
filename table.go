@@ -85,7 +85,8 @@ func (t *Table) Drop() error {
 	return os.RemoveAll(t.db.path + "/" + tableName.Hex())
 }
 
-// Get retrieves a value from a table with its primary key.
+// Get retrieves a value from a table with its primary key. dst must either be
+// a pointer or nil if you only want to get the counter or check for existence.
 func (t *Table) Get(key string, dst interface{}) (int, error) {
 	var item badger.KVItem
 	err := t.data.Get([]byte(key), &item)
@@ -95,6 +96,10 @@ func (t *Table) Get(key string, dst interface{}) (int, error) {
 
 	if item.Value() == nil {
 		return 0, ErrNotFound
+	}
+
+	if dst == nil {
+		return int(item.Counter()), nil
 	}
 
 	return int(item.Counter()), msgpack.Unmarshal(item.Value(), dst)
@@ -399,7 +404,7 @@ func (t *Table) Index(index string) *Index {
 // value.
 func (t *Table) Update(key string, handler interface{}) error {
 	handlerType := reflect.TypeOf(handler)
-	if handlerType.Kind() != reflect.Func {
+	if handlerType == nil || handlerType.Kind() != reflect.Func {
 		return errors.New("cete: handler must be a function")
 	}
 

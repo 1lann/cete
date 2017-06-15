@@ -3,34 +3,19 @@ package cete
 import (
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 )
 
-func TestUpdate(t *testing.T) {
+type Counter struct {
+	Count int
+}
+
+func TestConsistency(t *testing.T) {
 	t.Parallel()
 
-	people := map[string]Person{
-		"jason": {
-			Name: "Jason",
-			City: "Sydney",
-			Age:  17,
-		},
-		"ben": {
-			Name: "Ben",
-			City: "Melbourne",
-			Age:  19,
-		},
-		"drew": {
-			Name: "Drew",
-			City: "London",
-			Age:  18,
-		},
-	}
-
 	dir, err := ioutil.TempDir("", "cete_")
-	if err != nil {
-		t.Error(err)
-	}
+	panicNotNil(err)
 
 	t.Log("testing directory:", dir)
 	defer func() {
@@ -40,93 +25,97 @@ func TestUpdate(t *testing.T) {
 	}()
 
 	db, err := Open(dir + "/data")
-	if err != nil {
-		t.Fatal(err)
+	panicNotNil(err)
+
+	err = db.NewTable("table_update")
+	panicNotNil(err)
+
+	err = db.Table("table_update").Set("test", Counter{
+		Count: 0,
+	})
+	panicNotNil(err)
+
+	gun := new(sync.WaitGroup)
+	gun.Add(1)
+
+	wg := new(sync.WaitGroup)
+	wg.Add(200)
+
+	for i := 0; i < 200; i++ {
+		go func() {
+			defer wg.Done()
+
+			gun.Wait()
+
+			uErr := db.Table("table_update").Update("test",
+				func(c Counter) (Counter, error) {
+					c.Count++
+					return c, nil
+				})
+			panicNotNil(uErr)
+		}()
 	}
 
+	gun.Done()
+
+	wg.Wait()
+	var counter Counter
+	_, err = db.Table("table_update").Get("test", &counter)
+	panicNotNil(err)
+
+	if counter.Count != 200 {
+		t.Fatal("count should be 200, but isn't")
+	}
+}
+
+func TestUpdateErrors(t *testing.T) {
+	t.Parallel()
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
 	defer func() {
-		db.Close()
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
 	}()
 
-	err = db.NewTable("update_testing")
-	if err != nil {
-		t.Fatal(err)
-	}
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
 
-	for name, person := range people {
-		err = db.Table("update_testing").Set(name, person)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	err = db.NewTable("table_update")
+	panicNotNil(err)
 
-	err = db.Table("update_testing").NewIndex("Age")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = db.Table("update_testing").Update("someoneelse", func(jason Person) (Person, error) {
-		jason.Age++
-		return jason, nil
+	err = db.Table("table_update").Set("test", Counter{
+		Count: 0,
 	})
+	panicNotNil(err)
+
+	err = db.Table("table_update").Update("test", nil)
+	if err.Error() != "cete: handler must be a function" {
+		t.Fatal("incorrect error message")
+	}
+
+	err = db.Table("table_update").Update("test", func() {})
+	if err.Error() != "cete: handler must have 1 input argument" {
+		t.Fatal("incorrect error message")
+	}
+
+	err = db.Table("table_update").Update("test", func(c Counter) {})
+	if err.Error() != "cete: handler must have 2 return values" {
+		t.Fatal("incorrect error message")
+	}
+
+	err = db.Table("table_update").Update("test",
+		func(c Counter) (error, Counter) { return nil, Counter{} })
+	if err.Error() != "cete: handler must have error as last return value" {
+		t.Fatal("incorrect error message")
+	}
+
+	err = db.Table("table_update").Update("not exist",
+		func(c Counter) (Counter, error) { return Counter{}, nil })
 	if err != ErrNotFound {
 		t.Fatal("error should be ErrNotFound, but isn't")
 	}
-
-	err = db.Table("update_testing").Update("jason", func(jason Person) (Person, error) {
-		jason.Age++
-		return jason, nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var person Person
-	_, err = db.Table("update_testing").Get("jason", &person)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	newJason := people["jason"]
-	newJason.Age = 18
-
-	if !person.IsSame(newJason) {
-		t.Fatal("jason's age should have changed, but it hasn't")
-	}
-
-	var a Person
-	var b Person
-
-	r, err := db.Table("update_testing").Index("Age").GetAll(18)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		r.Close()
-	}()
-
-	_, _, err = r.Next(&a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, _, err = r.Next(&b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
-		t.Fatal("error should be ErrEndOfRange, but isn't")
-	}
-
-	if !((a.IsSame(newJason) || a.IsSame(people["drew"])) &&
-		(b.IsSame(newJason) || b.IsSame(people["drew"]))) {
-		t.Fatal("a and b should be newJason or drew, but aren't")
-	}
-
-	if a.IsSame(b) {
-		t.Fatal("a and be should not be the same, but are")
-	}
-
 }

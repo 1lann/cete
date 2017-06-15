@@ -92,10 +92,8 @@ func (i *Index) fill(name string) error {
 	for {
 		entry = <-r.buffer
 		if entry.err == ErrEndOfRange {
-			r.Close()
 			break
 		} else if entry.err != nil {
-			r.Close()
 			return entry.err
 		}
 
@@ -116,7 +114,8 @@ func (i *Index) fill(name string) error {
 }
 
 // One puts the first matching value with the index's key into dst. dst
-// must be a pointer. Note that indexes are non-unique, a single index key
+// must either be a pointer or nil if you would like to only get the key/counter
+// and check for existence. Note that indexes are non-unique, a single index key
 // can map to multiple values. Use GetAll to get all such matching values.
 func (i *Index) One(key interface{}, dst interface{}) (string, int, error) {
 	r, err := i.GetAll(key)

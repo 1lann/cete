@@ -73,16 +73,19 @@ func (t *Table) NewIndex(name string) error {
 		table: t,
 	}
 
-	if err = idx.fill(name); err != nil {
-		return err
-	}
-
 	t.indexes[Name(name)] = idx
+
+	if err = idx.indexValues(name); err != nil {
+		log.Println("cete: error while indexing \""+
+			idx.name()+"\", index likely corrupt:",
+			err)
+		return nil
+	}
 
 	return nil
 }
 
-func (i *Index) fill(name string) error {
+func (i *Index) indexValues(name string) error {
 	r := i.table.Between(MinBounds, MaxBounds)
 
 	var entry bufferEntry

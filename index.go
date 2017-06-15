@@ -77,8 +77,7 @@ func (t *Table) NewIndex(name string) error {
 
 	if err = idx.indexValues(name); err != nil {
 		log.Println("cete: error while indexing \""+
-			idx.name()+"\", index likely corrupt:",
-			err)
+			idx.name()+"\", index likely corrupt:", err)
 		return nil
 	}
 

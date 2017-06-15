@@ -12,7 +12,7 @@ type Counter struct {
 }
 
 func TestConsistency(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)
@@ -39,9 +39,9 @@ func TestConsistency(t *testing.T) {
 	gun.Add(1)
 
 	wg := new(sync.WaitGroup)
-	wg.Add(200)
+	wg.Add(100)
 
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 100; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -63,13 +63,13 @@ func TestConsistency(t *testing.T) {
 	_, err = db.Table("table_update").Get("test", &counter)
 	panicNotNil(err)
 
-	if counter.Count != 200 {
+	if counter.Count != 100 {
 		t.Fatal("count should be 200, but isn't")
 	}
 }
 
 func TestUpdateErrors(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)

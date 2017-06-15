@@ -8,7 +8,7 @@ import (
 )
 
 func TestFilter(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {

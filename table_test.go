@@ -21,7 +21,7 @@ func expectPerson(key string, r *Range, person Person) {
 }
 
 func TestTableBetween(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -193,7 +193,7 @@ func TestTableBetween(t *testing.T) {
 }
 
 func TestTableLoading(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -289,7 +289,7 @@ func TestTableLoading(t *testing.T) {
 }
 
 func TestTableCounter(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {

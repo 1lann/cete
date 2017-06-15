@@ -21,7 +21,7 @@ func (a Person) IsSame(b Person) bool {
 }
 
 func TestPostIndex(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -138,7 +138,7 @@ func TestPostIndex(t *testing.T) {
 }
 
 func TestPreIndex(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -255,7 +255,7 @@ func TestPreIndex(t *testing.T) {
 }
 
 func TestIndexDrop(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -387,7 +387,7 @@ func TestIndexDrop(t *testing.T) {
 }
 
 func TestIndexBetween(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -564,7 +564,7 @@ func TestIndexBetween(t *testing.T) {
 }
 
 func TestIndexSet(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -746,7 +746,7 @@ func TestIndexSet(t *testing.T) {
 }
 
 func TestTimeOrder(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	if bytes.Compare(valueToBytes(time.Now()),
 		valueToBytes(time.Now().Add(time.Minute))) >= 0 {
@@ -766,7 +766,7 @@ func TestTimeOrder(t *testing.T) {
 }
 
 func TestFloatOrder(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	if bytes.Compare(valueToBytes(12.34),
 		valueToBytes(12.35)) >= 0 {
@@ -784,7 +784,7 @@ func TestFloatOrder(t *testing.T) {
 }
 
 func TestIndexLoading(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {
@@ -883,7 +883,7 @@ func TestIndexLoading(t *testing.T) {
 }
 
 func TestIndexDelete(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 
 	people := map[string]Person{
 		"jason": {

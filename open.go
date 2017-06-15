@@ -43,7 +43,7 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 	return badger.NewKV(&opts)
 }
 
-// OpenDatabase opens the database at the provided path. It will create a new
+// Open opens the database at the provided path. It will create a new
 // database if the folder does not exist.
 func Open(path string) (*DB, error) {
 	db := &DB{

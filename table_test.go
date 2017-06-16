@@ -3,6 +3,7 @@ package cete
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -21,7 +22,9 @@ func expectPerson(key string, r *Range, person Person) {
 }
 
 func TestTableBetween(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -62,7 +65,7 @@ func TestTableBetween(t *testing.T) {
 		panicNotNil(err)
 	}
 
-	r := db.Table("table_testing").Between(MinBounds, MaxBounds)
+	r := db.Table("table_testing").Between(MinValue, MaxValue)
 
 	var person Person
 
@@ -79,7 +82,7 @@ func TestTableBetween(t *testing.T) {
 		t.Fatal("range should have automatically closed, but hasn't")
 	}
 
-	r = db.Table("table_testing").Between(MinBounds, MaxBounds, true)
+	r = db.Table("table_testing").Between(MinValue, MaxValue, true)
 
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
@@ -190,10 +193,45 @@ func TestTableBetween(t *testing.T) {
 	if err != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
+
+	r = db.Table("table_testing").Between(MinValue, MinValue)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("table_testing").Between(MaxValue, MaxValue)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("table_testing").Between("zzzzzzz", MaxValue)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
 }
 
 func TestTableLoading(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -289,7 +327,9 @@ func TestTableLoading(t *testing.T) {
 }
 
 func TestTableCounter(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -376,4 +416,96 @@ func TestTableCounter(t *testing.T) {
 	if err != ErrNotFound {
 		t.Fatal("error should be ErrNotFound, but isn't")
 	}
+}
+
+func TestTableNaming(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
+	defer func() {
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
+	}()
+
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
+
+	defer func() {
+		db.Close()
+	}()
+
+	err = db.NewTable("")
+	if err != ErrBadIdentifier {
+		t.Fatal("error should be ErrBadIdentifier, but isn't")
+	}
+
+	err = db.NewTable(strings.Repeat("abcdefghijklmnopqrstuvwxyz", 10))
+	if err != ErrBadIdentifier {
+		t.Fatal("error should be ErrBadIdentifier, but isn't")
+	}
+
+	tableName := "testing 😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 😘 😗 "
+
+	panicNotNil(db.NewTable(tableName))
+
+	err = db.NewTable(tableName)
+	if err != ErrAlreadyExists {
+		t.Fatal("error should be ErrAlreadyExists, but isn't")
+	}
+
+	err = db.Table(tableName).NewIndex("")
+	if err != ErrBadIdentifier {
+		t.Fatal("error should be ErrBadIdentifier, but isn't")
+	}
+
+	err = db.Table(tableName).NewIndex(strings.Repeat("abcdefghijklmnopqrstuvwxyz", 10))
+	if err != ErrBadIdentifier {
+		t.Fatal("error should be ErrBadIdentifier, but isn't")
+	}
+
+	panicNotNil(db.Table(tableName).NewIndex(tableName))
+
+	err = db.Table(tableName).NewIndex(tableName)
+	if err != ErrAlreadyExists {
+		t.Fatal("error should be ErrAlreadyExists, but isn't")
+	}
+}
+
+func TestInvalidTypes(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
+	defer func() {
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
+	}()
+
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
+
+	defer func() {
+		db.Close()
+	}()
+
+	panicNotNil(db.NewTable("types_testing"))
+
+	err = db.Table("types_testing").Set("invalid", func() {})
+	if err == nil {
+		t.Fatal("set should have an error, but doesn't")
+	}
+
+	panicNotNil(db.Table("types_testing").Set("valid", "just some data"))
+
 }

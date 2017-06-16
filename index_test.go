@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Person struct {
@@ -21,7 +23,9 @@ func (a Person) IsSame(b Person) bool {
 }
 
 func TestPostIndex(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -138,7 +142,9 @@ func TestPostIndex(t *testing.T) {
 }
 
 func TestPreIndex(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -255,7 +261,9 @@ func TestPreIndex(t *testing.T) {
 }
 
 func TestIndexDrop(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -387,7 +395,9 @@ func TestIndexDrop(t *testing.T) {
 }
 
 func TestIndexBetween(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -433,7 +443,7 @@ func TestIndexBetween(t *testing.T) {
 		panicNotNil(err)
 	}
 
-	r := db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds)
+	r := db.Table("index_testing").Index("Age").Between(MinValue, MaxValue)
 
 	var person Person
 
@@ -450,7 +460,7 @@ func TestIndexBetween(t *testing.T) {
 		t.Fatal("range should have automatically closed, but hasn't")
 	}
 
-	r = db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds, true)
+	r = db.Table("index_testing").Index("Age").Between(MinValue, MaxValue, true)
 
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
@@ -490,6 +500,39 @@ func TestIndexBetween(t *testing.T) {
 	}
 
 	r = db.Table("index_testing").Index("Age").Between(20, 14)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("index_testing").Index("Age").Between(MinValue, MinValue)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("index_testing").Index("Age").Between(MaxValue, MaxValue)
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("index_testing").Index("Age").Between(100, MaxValue)
 
 	_, _, err = r.Next(&person)
 	if err != ErrEndOfRange {
@@ -564,7 +607,9 @@ func TestIndexBetween(t *testing.T) {
 }
 
 func TestIndexSet(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -615,7 +660,7 @@ func TestIndexSet(t *testing.T) {
 		panicNotNil(err)
 	}
 
-	r := db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds)
+	r := db.Table("index_testing").Index("Age").Between(MinValue, MaxValue)
 
 	var person Person
 
@@ -632,7 +677,7 @@ func TestIndexSet(t *testing.T) {
 		t.Fatal("range should have automatically closed, but hasn't")
 	}
 
-	r = db.Table("index_testing").Index("Age").Between(MinBounds, MaxBounds, true)
+	r = db.Table("index_testing").Index("Age").Between(MinValue, MaxValue, true)
 
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
@@ -745,8 +790,10 @@ func TestIndexSet(t *testing.T) {
 	}
 }
 
-func TestTimeOrder(t *testing.T) {
-	// t.Parallel()
+func TestOrdering(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	if bytes.Compare(valueToBytes(time.Now()),
 		valueToBytes(time.Now().Add(time.Minute))) >= 0 {
@@ -763,10 +810,6 @@ func TestTimeOrder(t *testing.T) {
 	if bytes.Compare(valueToBytes(sameTime), valueToBytes(sameTime)) != 0 {
 		t.Fatal("time should obey reflexive property of equality, but isn't")
 	}
-}
-
-func TestFloatOrder(t *testing.T) {
-	// t.Parallel()
 
 	if bytes.Compare(valueToBytes(12.34),
 		valueToBytes(12.35)) >= 0 {
@@ -783,8 +826,44 @@ func TestFloatOrder(t *testing.T) {
 	}
 }
 
+func testArrayCount(t *testing.T, count int) {
+	stringsList := make([]string, count)
+	data, err := msgpack.Marshal(stringsList)
+	panicNotNil(err)
+	result := decodeArrayCount(data)
+	if result != int64(count) {
+		t.Fatal("expected count of", count, "instead got", result)
+	}
+}
+
+func TestArrayCounting(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testArrayCount(t, 0)
+	testArrayCount(t, 1)
+	testArrayCount(t, 2)
+	testArrayCount(t, 3)
+	testArrayCount(t, 4)
+	testArrayCount(t, 5)
+	testArrayCount(t, 10)
+	testArrayCount(t, 13)
+	testArrayCount(t, 14)
+	testArrayCount(t, 15)
+	testArrayCount(t, 16)
+	testArrayCount(t, 17)
+	testArrayCount(t, 65534)
+	testArrayCount(t, 65535)
+	testArrayCount(t, 65536)
+	testArrayCount(t, 65537)
+	testArrayCount(t, 100000)
+}
+
 func TestIndexLoading(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -883,7 +962,9 @@ func TestIndexLoading(t *testing.T) {
 }
 
 func TestIndexDelete(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {

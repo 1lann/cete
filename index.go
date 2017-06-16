@@ -14,8 +14,8 @@ type Bounds int
 
 // Valid bounds.
 var (
-	MinBounds Bounds = 1
-	MaxBounds Bounds = 2
+	MinValue Bounds = 1
+	MaxValue Bounds = 2
 )
 
 // NewIndex creates a new index on the table, using the name as the Query.
@@ -85,7 +85,7 @@ func (t *Table) NewIndex(name string) error {
 }
 
 func (i *Index) indexValues(name string) error {
-	r := i.table.Between(MinBounds, MaxBounds)
+	r := i.table.Between(MinValue, MaxValue)
 
 	var entry bufferEntry
 	var results []interface{}
@@ -148,8 +148,12 @@ func (i *Index) GetAll(key interface{}) (*Range, error) {
 		return nil, ErrNotFound
 	}
 
+	return i.getAllValues(item.Value())
+}
+
+func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 	var keys []string
-	err = msgpack.Unmarshal(item.Value(), &keys)
+	err := msgpack.Unmarshal(indexValue, &keys)
 	if err != nil {
 		log.Println("cete: corrupt index \""+i.name()+"\":", err)
 		return nil, ErrIndexError
@@ -162,6 +166,7 @@ func (i *Index) GetAll(key interface{}) (*Range, error) {
 
 	c := 0
 	var value []byte
+	var item badger.KVItem
 
 	return newRange(func() (string, []byte, int, error) {
 		for {
@@ -194,10 +199,15 @@ func (i *Index) GetAll(key interface{}) (*Range, error) {
 // The bounds are inclusive on both ends. It is possible to have
 // duplicate documents if the same document has multiple unique index values.
 //
-// You can use cete.MinBounds and cete.MaxBounds to specify minimum and maximum
+// You can use cete.MinValue and cete.MaxValue to specify minimum and maximum
 // bound values.
-func (i *Index) Between(lower, upper interface{},
-	reverse ...bool) *Range {
+func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
+	if lower == MaxValue || upper == MinValue {
+		return newRange(func() (string, []byte, int, error) {
+			return "", nil, 0, ErrEndOfRange
+		}, func() {})
+	}
+
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
 	itOpts := badger.DefaultIteratorOptions
@@ -209,13 +219,13 @@ func (i *Index) Between(lower, upper interface{},
 	lowerBytes := valueToBytes(lower)
 
 	if !shouldReverse {
-		if lower == MinBounds {
+		if lower == MinValue {
 			it.Rewind()
 		} else {
 			it.Seek(lowerBytes)
 		}
 	} else {
-		if upper == MaxBounds {
+		if upper == MaxValue {
 			it.Rewind()
 		} else {
 			it.Seek(upperBytes)
@@ -231,6 +241,63 @@ func (i *Index) Between(lower, upper interface{},
 			}
 			it.Close()
 		})
+}
+
+// CountBetween returns the number of documents whose index values are
+// within the given bounds. It is an optimized version of
+// Between(lower, upper).Count(). Note that like with Between, double counting
+// for documents is possible if the document has multiple unique index values.
+func (i *Index) CountBetween(lower, upper interface{}) int64 {
+	if lower == MaxValue || upper == MinValue {
+		return 0
+	}
+
+	itOpts := badger.DefaultIteratorOptions
+	itOpts.PrefetchSize = 5
+	it := i.index.NewIterator(itOpts)
+
+	upperBytes := valueToBytes(upper)
+	lowerBytes := valueToBytes(lower)
+
+	if lower == MinValue {
+		it.Rewind()
+	} else {
+		it.Seek(lowerBytes)
+	}
+
+	var count int64
+
+	for it.Valid() {
+		if upper != MaxValue &&
+			bytes.Compare(it.Item().Key(), upperBytes) > 0 {
+			return count
+		}
+
+		if len(it.Item().Value()) < 5 {
+			// Malformed index value my cause a panic here
+			count += decodeArrayCount(it.Item().Value())
+		} else {
+			count += decodeArrayCount(it.Item().Value()[:5])
+		}
+
+		it.Next()
+	}
+
+	return count
+}
+
+func decodeArrayCount(header []byte) int64 {
+	if (header[0] >> 4) == 9 {
+		return int64(header[0] & 0xf)
+	} else if header[0] == 0xdc {
+		return int64(header[1])<<8 + int64(header[2])
+	} else if header[0] == 0xdd {
+		return int64(header[1])<<24 + int64(header[2])<<16 +
+			int64(header[3])<<8 + int64(header[4])
+	}
+
+	// not a valid array
+	return 0
 }
 
 func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
@@ -252,15 +319,15 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 		}
 
 		for it.Valid() {
-			if !shouldReverse && upper != MaxBounds &&
+			if !shouldReverse && upper != MaxValue &&
 				bytes.Compare(it.Item().Key(), upperBytes) > 0 {
 				return "", nil, 0, ErrEndOfRange
-			} else if shouldReverse && lower != MinBounds &&
+			} else if shouldReverse && lower != MinValue &&
 				bytes.Compare(it.Item().Key(), lowerBytes) < 0 {
 				return "", nil, 0, ErrEndOfRange
 			}
 
-			r, err := i.GetAll(it.Item().Key())
+			r, err := i.getAllValues(it.Item().Value())
 			it.Next()
 			if err != nil {
 				continue
@@ -281,9 +348,9 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 }
 
 // All returns all the documents which have an index value. It is shorthand
-// for Between(MinBounds, MaxBounds, reverse...)
+// for Between(MinValue, MaxValue, reverse...)
 func (i *Index) All(reverse ...bool) *Range {
-	return i.Between(MinBounds, MaxBounds, reverse...)
+	return i.Between(MinValue, MaxValue, reverse...)
 }
 
 // Drop drops the index from the table, deleting its folder from the disk.

@@ -8,7 +8,9 @@ import (
 )
 
 func TestFilter(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	people := map[string]Person{
 		"jason": {
@@ -137,5 +139,29 @@ func TestFilter(t *testing.T) {
 	err = r.Skip(3)
 	if err != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
+		return doc.QueryFloat64("Height") > 0.5
+	})
+
+	key, _, err := r.Next(nil)
+	panicNotNil(err)
+
+	if key != "ben" {
+		t.Fatal("key should be ben, but isn't")
+	}
+	key, _, err = r.Next(nil)
+	panicNotNil(err)
+
+	if key != "drew" {
+		t.Fatal("key should be drew, but isn't")
+	}
+
+	key, _, err = r.Next(nil)
+	panicNotNil(err)
+
+	if key != "jason" {
+		t.Fatal("key should be jason, but isn't")
 	}
 }

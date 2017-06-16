@@ -12,7 +12,9 @@ type Counter struct {
 }
 
 func TestConsistency(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)
@@ -69,7 +71,9 @@ func TestConsistency(t *testing.T) {
 }
 
 func TestUpdateErrors(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)

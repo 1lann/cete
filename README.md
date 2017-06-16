@@ -164,7 +164,7 @@ func main() {
 	db.Table("people").NewIndex("Age")
 
 	// Find who is no younger than 13. This would also be sorted ascending by age.
-	r := db.Table("people").Index("Age").Between(13, cete.MaxBounds)
+	r := db.Table("people").Index("Age").Between(13, cete.MaxValue)
 
 	var person Person
 	r.Next(&person)

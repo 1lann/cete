@@ -18,7 +18,9 @@ func panicNotNil(err error) {
 }
 
 func TestBasic(t *testing.T) {
-	// t.Parallel()
+	if testing.Short() {
+		t.Parallel()
+	}
 
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)

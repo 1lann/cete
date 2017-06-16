@@ -443,13 +443,16 @@ func (t *Table) Update(key string, handler interface{}) error {
 }
 
 func (t *Table) name() string {
+	foundTable := "__unknown_table"
+
 	for tableName, table := range t.db.tables {
 		if table == t {
-			return string(tableName)
+			foundTable = string(tableName)
+			break
 		}
 	}
 
-	return "__unknown_table"
+	return foundTable
 }
 
 // Between returns a Range of documents between the lower and upper key values
@@ -457,10 +460,16 @@ func (t *Table) name() string {
 // reverse the sorting by specifying true to the optional reverse parameter.
 // The bounds are inclusive on both ends.
 //
-// You can use cete.MinBounds and cete.MaxBounds to specify minimum and maximum
+// You can use cete.MinValue and cete.MaxValue to specify minimum and maximum
 // bound values.
 func (t *Table) Between(lower interface{}, upper interface{},
 	reverse ...bool) *Range {
+	if lower == MaxValue || upper == MinValue {
+		return newRange(func() (string, []byte, int, error) {
+			return "", nil, 0, ErrEndOfRange
+		}, func() {})
+	}
+
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
 	itOpts := badger.DefaultIteratorOptions
@@ -472,13 +481,13 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	lowerBytes := valueToBytes(lower)
 
 	if !shouldReverse {
-		if lower == MinBounds {
+		if lower == MinValue {
 			it.Rewind()
 		} else {
 			it.Seek(lowerBytes)
 		}
 	} else {
-		if upper == MaxBounds {
+		if upper == MaxValue {
 			it.Rewind()
 		} else {
 			it.Seek(upperBytes)
@@ -491,10 +500,10 @@ func (t *Table) Between(lower interface{}, upper interface{},
 
 	return newRange(func() (string, []byte, int, error) {
 		for it.Valid() {
-			if !shouldReverse && upper != MaxBounds &&
+			if !shouldReverse && upper != MaxValue &&
 				bytes.Compare(it.Item().Key(), upperBytes) > 0 {
 				return "", nil, 0, ErrEndOfRange
-			} else if shouldReverse && lower != MinBounds &&
+			} else if shouldReverse && lower != MinValue &&
 				bytes.Compare(it.Item().Key(), lowerBytes) < 0 {
 				return "", nil, 0, ErrEndOfRange
 			}
@@ -511,10 +520,48 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	}, it.Close)
 }
 
+// CountBetween returns the number of documents whose key values are
+// within the given inclusive bounds. It's an optimized version of
+// Between(lower, upper).Count().
+func (t *Table) CountBetween(lower, upper interface{}) int64 {
+	if lower == MaxValue || upper == MinValue {
+		return 0
+	}
+
+	itOpts := badger.DefaultIteratorOptions
+	itOpts.PrefetchSize = 5
+	itOpts.FetchValues = false
+	it := t.data.NewIterator(itOpts)
+
+	upperBytes := valueToBytes(upper)
+	lowerBytes := valueToBytes(lower)
+
+	if lower == MinValue {
+		it.Rewind()
+	} else {
+		it.Seek(lowerBytes)
+	}
+
+	var count int64
+
+	for it.Valid() {
+		if upper != MaxValue &&
+			bytes.Compare(it.Item().Key(), upperBytes) > 0 {
+			return count
+		}
+
+		count++
+
+		it.Next()
+	}
+
+	return count
+}
+
 // All returns all the documents in the table. It is shorthand
-// for Between(MinBounds, MaxBounds, reverse...)
+// for Between(MinValue, MaxValue, reverse...)
 func (t *Table) All(reverse ...bool) *Range {
-	return t.Between(MinBounds, MaxBounds, reverse...)
+	return t.Between(MinValue, MaxValue, reverse...)
 }
 
 // Indexes returns the list of indexes in the table.

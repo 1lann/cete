@@ -985,20 +985,7 @@ func TestOrdering(t *testing.T) {
 	}
 
 	b := []byte{1, 2, 3, 4, 5, 6}
-	if bytes.Compare(valueToBytes(b), b) != 0 {
-		t.Fatal("bytes should be the same, but isn't")
-	}
-
-	if len(valueToBytes(b, true)) != indexedBytesSize {
-		t.Fatal("bytes should be indexedBytesSize long, but isn't")
-	}
-
-	b = make([]byte, 300)
-	for i := 0; i < 300; i++ {
-		b[i] = byte(i % 200)
-	}
-
-	if bytes.Compare(valueToBytes([]interface{}{b}), b[:indexedBytesSize]) != 0 {
+	if bytes.Compare(valueToBytes(b), append(b, 0)) != 0 {
 		t.Fatal("bytes should be the same, but isn't")
 	}
 }

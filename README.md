@@ -12,7 +12,7 @@
 
 Cete is a simple, lightweight, pure Go database abstraction layer of [Badger](https://github.com/dgraph-io/badger) for use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
-**This is just a personal hobby project, I may not maintain this! I just wanted to make my own database for fun.**
+**Cete is currently in alpha, breaking changes may be released.**
 
 Here's a short example to show how easy it is to use the database:
 
@@ -55,6 +55,8 @@ func main() {
 ## Features
 
 - Indexes.
+- Compound indexes.
+- Multi-indexes.
 - All range queries are sorted (ascending by default).
 - Uses [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
 - All range queries are buffered in the background, 100 results at a time.
@@ -68,13 +70,14 @@ func main() {
 ## Important limitations
 
 - When indexed, strings are case unsensitized using `strings.ToLower`. If you don't want this behavior, use a byte slice instead.
-- When working with compound indexes, an individual string or byte slice in the compound index is limited to 256 bytes, and will be trimmed if it is over 256 bytes. This limitation is not present in normal indexes that are purely a string or byte slice.
 - Indexing with numbers above maximum int64 is unsupported and will result in undefined behavior when using `Between`. Note that it's fine to index uint64, just values over max int64 (9,223,372,036,854,775,807) will result in issues when using `Between`.
 - When working with compound indexes, you may use `MaxValue` and `MinValue` as maximum integers or minimum integers of any size and float64s. This however cannot be be used for float32.
 
-## Documentation
+## Documentation and examples
 
 Find documentation on [GoDoc](https://godoc.org/github.com/1lann/cete).
+
+Examples can be found on the [wiki](https://github.com/1lann/cete/wiki).
 
 ## Performance
 
@@ -87,10 +90,6 @@ These benchmarks consists of simple sets and gets. However the gets were by seco
 ![Cete benchmarks](https://chuie.io/cete.png)
 
 Cete is typically twice as fast as Storm for concurrent operations, and BoltHold was magnitudes slower than either. Cete is actually quite slow when it comes to sequential write operations (and isn't shown here), so it's strongly recommended to write concurrently. Cete also fairs similarly to Storm with sequential reads.
-
-## Examples
-
-The following examples don't handle errors for the sake of example. It is strongly recommended to handle errors as the library will not print out when errors occur (unless it detects a corrupt index).
 
 ### Filtering
 

@@ -8,6 +8,10 @@ import (
 )
 
 func TestQuery(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
 	now := time.Now()
 	jason := Person{
 		Name:   "Jason",

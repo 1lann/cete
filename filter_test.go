@@ -1,6 +1,7 @@
 package cete
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -61,9 +62,9 @@ func TestFilter(t *testing.T) {
 		panicNotNil(err)
 	}
 
-	r := db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryInt("Age") > 17
-	})
+	r := db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryInt("Age") > 17, nil
+	}, 2)
 
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
@@ -78,9 +79,9 @@ func TestFilter(t *testing.T) {
 		t.Fatal("range should have automatically closed, but hasn't")
 	}
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 1.75
-	})
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 1.75, nil
+	}, 1)
 
 	expectPerson("ben", r, people["ben"])
 	expectPerson("jason", r, people["jason"])
@@ -90,8 +91,8 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryTime("DOB").After(time.Date(2000, 01, 01, 01, 01, 01, 01, time.UTC))
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryTime("DOB").After(time.Date(2000, 01, 01, 01, 01, 01, 01, time.UTC)), nil
 	})
 
 	expectPerson("drew", r, people["drew"])
@@ -101,8 +102,8 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 1.75
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 1.75, nil
 	})
 
 	n, err := r.Count()
@@ -116,15 +117,15 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 1.75
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 1.75, nil
 	})
 
 	err = r.Skip(2)
 	panicNotNil(err)
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 1.75
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 1.75, nil
 	})
 
 	err = r.Skip(1)
@@ -132,8 +133,8 @@ func TestFilter(t *testing.T) {
 
 	expectPerson("jason", r, people["jason"])
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 1.75
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 1.75, nil
 	})
 
 	err = r.Skip(3)
@@ -141,8 +142,8 @@ func TestFilter(t *testing.T) {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r = db.Table("filter_testing").All().Filter(func(doc Document) bool {
-		return doc.QueryFloat64("Height") > 0.5
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return doc.QueryFloat64("Height") > 0.5, nil
 	})
 
 	key, _, err := r.Next(nil)
@@ -163,5 +164,16 @@ func TestFilter(t *testing.T) {
 
 	if key != "jason" {
 		t.Fatal("key should be jason, but isn't")
+	}
+
+	filterError := errors.New("cete testing: filter error")
+
+	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
+		return false, filterError
+	})
+
+	_, _, err = r.Next(nil)
+	if err != filterError {
+		t.Fatal("error should be filter error, but isn't")
 	}
 }

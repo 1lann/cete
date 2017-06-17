@@ -475,8 +475,30 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	itOpts.Reverse = shouldReverse
 	it := t.data.NewIterator(itOpts)
 
-	upperBytes := valueToBytes(upper)
-	lowerBytes := valueToBytes(lower)
+	upperString, isString := upper.(string)
+	_, isBounds := upper.(Bounds)
+	if !isString && !isBounds {
+		log.Println("cete: warning: lower and upper bounds of " +
+			"table.Between must be a string or Bounds. An empty range has " +
+			"been returned instead")
+		return newRange(func() (string, []byte, int, error) {
+			return "", nil, 0, ErrEndOfRange
+		}, func() {})
+	}
+
+	lowerString, isString := lower.(string)
+	_, isBounds = lower.(Bounds)
+	if !isString && !isBounds {
+		log.Println("cete: warning: lower and upper bounds of " +
+			"table.Between must be a string or Bounds. An empty range has " +
+			"been returned instead")
+		return newRange(func() (string, []byte, int, error) {
+			return "", nil, 0, ErrEndOfRange
+		}, func() {})
+	}
+
+	upperBytes := []byte(upperString)
+	lowerBytes := []byte(lowerString)
 
 	if !shouldReverse {
 		if lower == MinValue {
@@ -519,8 +541,8 @@ func (t *Table) Between(lower interface{}, upper interface{},
 }
 
 // CountBetween returns the number of documents whose key values are
-// within the given inclusive bounds. It's an optimized version of
-// Between(lower, upper).Count().
+// within the given inclusive bounds. Lower and upper must be strings or Bounds.
+// It's an optimized version of Between(lower, upper).Count().
 func (t *Table) CountBetween(lower, upper interface{}) int64 {
 	if lower == MaxValue || upper == MinValue {
 		return 0
@@ -531,8 +553,26 @@ func (t *Table) CountBetween(lower, upper interface{}) int64 {
 	itOpts.FetchValues = false
 	it := t.data.NewIterator(itOpts)
 
-	upperBytes := valueToBytes(upper)
-	lowerBytes := valueToBytes(lower)
+	upperString, isString := upper.(string)
+	_, isBounds := upper.(Bounds)
+	if !isString && !isBounds {
+		log.Println("cete: warning: lower and upper bounds of " +
+			"table.CountBetween must be a string or Bounds. A count of 0 has " +
+			"been returned instead")
+		return 0
+	}
+
+	lowerString, isString := lower.(string)
+	_, isBounds = lower.(Bounds)
+	if !isString && !isBounds {
+		log.Println("cete: warning: lower and upper bounds of " +
+			"table.CountBetween must be a string or Bounds. A count of 0 has " +
+			"been returned instead")
+		return 0
+	}
+
+	upperBytes := []byte(upperString)
+	lowerBytes := []byte(lowerString)
 
 	if lower == MinValue {
 		it.Rewind()

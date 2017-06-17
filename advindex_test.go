@@ -52,6 +52,7 @@ func TestCompoundIndex(t *testing.T) {
 	panicNotNil(db.NewTable("index_testing"))
 
 	panicNotNil(db.Table("index_testing").NewIndex("Age,Name"))
+	panicNotNil(db.Table("index_testing").NewIndex("Name,Age"))
 
 	for name, person := range people {
 		err = db.Table("index_testing").Set(name, person)
@@ -89,6 +90,26 @@ func TestCompoundIndex(t *testing.T) {
 		[]interface{}{18, "da"}, []interface{}{18, "ko"})
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
+
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("index_testing").Index("Name,Age").All()
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
+	expectPerson("jason", r, people["jason"])
+	expectPerson("matheus", r, people["matheus"])
+
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("index_testing").Index("Name,Age").Between("b", "e")
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
 
 	_, _, err = r.Next(nil)
 	if err != ErrEndOfRange {

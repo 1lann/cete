@@ -218,7 +218,29 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between("zzzzzzz", MaxValue)
 
-	_, _, err = r.Next(&person)
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("table_testing").Between(0, MaxValue)
+
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	if r.closed != 1 {
+		t.Fatal("range should have automatically closed, but hasn't")
+	}
+
+	r = db.Table("table_testing").Between(MinValue, 0)
+
+	_, _, err = r.Next(nil)
 	if err != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}

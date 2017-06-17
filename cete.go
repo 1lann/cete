@@ -30,8 +30,6 @@ var (
 // Name represents a table or index identifier.
 type Name string
 
-const indexedBytesSize = 256
-
 // Hex returns the hexadecimal representation of the name.
 func (n Name) Hex() string {
 	return hex.EncodeToString([]byte(n))
@@ -98,7 +96,7 @@ func integerToBytes(integer interface{}) []byte {
 	return result
 }
 
-func valueToBytes(value interface{}, fixedSize ...bool) (b []byte) {
+func valueToBytes(value interface{}) (b []byte) {
 	switch v := value.(type) {
 	case int, int16, int32, int64, uint16, uint32, uint64:
 		return integerToBytes(v)
@@ -107,19 +105,13 @@ func valueToBytes(value interface{}, fixedSize ...bool) (b []byte) {
 	case float64:
 		return integerToBytes(math.Float64bits(v))
 	case string:
-		if len(fixedSize) > 0 && fixedSize[0] {
-			return fixSize([]byte(strings.ToLower(v)))
-		}
-		return []byte(strings.ToLower(v))
+		return append([]byte(strings.ToLower(v)), 0)
 	case []byte:
-		if len(fixedSize) > 0 && fixedSize[0] {
-			return fixSize(v)
-		}
-		return v
+		return append(v, 0)
 	case []interface{}:
 		var result []byte
 		for _, vv := range v {
-			result = append(result, valueToBytes(vv, true)...)
+			result = append(result, valueToBytes(vv)...)
 		}
 		return result
 	case time.Time:
@@ -129,14 +121,6 @@ func valueToBytes(value interface{}, fixedSize ...bool) (b []byte) {
 	}
 
 	panic(fmt.Sprintf("cete: unsupported value: %v", value))
-}
-
-func fixSize(data []byte) []byte {
-	if len(data) >= indexedBytesSize {
-		return data[:indexedBytesSize]
-	}
-
-	return append(data, make([]byte, indexedBytesSize-len(data))...)
 }
 
 // Document represents the value of a document.

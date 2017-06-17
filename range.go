@@ -78,23 +78,99 @@ func newRange(next func() (string, []byte, int, error), closer func()) *Range {
 }
 
 // Filter applies a filter onto the range, skipping values where the provided
-// filter returns false.
-func (r *Range) Filter(filter func(doc Document) bool) *Range {
-	var entry bufferEntry
+// filter returns false. If the filter returns a non-nil error, the range
+// will be stopped, and the error will be returned.
+//
+// You can optionally specify the number of workers
+// to concurrently operate the filter to speed up long running filter queries.
+// Note that you will still be limited by the read speed, and having too many
+// workers will increase concurrency overhead. The default number of workers
+// is 5.
+func (r *Range) Filter(filter func(doc Document) (bool, error),
+	workers ...int) *Range {
+
+	numWorkers := 5
+	if len(workers) > 0 && workers[0] != 0 {
+		numWorkers = workers[0]
+	}
+
+	inboxes := make([]chan *bufferEntry, numWorkers)
+	outboxes := make([]chan *bufferEntry, numWorkers)
+	for i := range inboxes {
+		inboxes[i] = make(chan *bufferEntry)
+		outboxes[i] = make(chan *bufferEntry)
+		go filterWorker(filter, inboxes[i], outboxes[i])
+	}
+
+	go func() {
+		sendToWorker := 0
+
+		for {
+			entry, more := <-r.buffer
+			if !more {
+				break
+			}
+
+			inboxes[sendToWorker] <- &entry
+			sendToWorker = (sendToWorker + 1) % numWorkers
+		}
+
+		for _, inbox := range inboxes {
+			close(inbox)
+		}
+	}()
+
+	readFromWorker := 0
+	var entry *bufferEntry
 
 	return newRange(func() (string, []byte, int, error) {
 		for {
-			entry = <-r.buffer
+			entry = <-outboxes[readFromWorker]
+			readFromWorker = (readFromWorker + 1) % numWorkers
+			if entry.key == "" && entry.err == nil {
+				continue
+			}
 
 			if entry.err != nil {
-				return entry.key, entry.data, entry.counter, entry.err
+				r.Close()
 			}
 
-			if filter(Document(entry.data)) {
-				return entry.key, entry.data, entry.counter, entry.err
-			}
+			return entry.key, entry.data, entry.counter, entry.err
 		}
 	}, r.Close)
+}
+
+func filterWorker(filter func(doc Document) (bool, error),
+	inbox chan *bufferEntry, outbox chan *bufferEntry) {
+	var entry *bufferEntry
+	var ok bool
+	var err error
+	var more bool
+
+	for {
+		entry, more = <-inbox
+		if !more {
+			return
+		}
+
+		if entry.err != nil {
+			outbox <- entry
+			continue
+		}
+
+		ok, err = filter(Document(entry.data))
+		if err != nil {
+			entry.err = err
+			outbox <- entry
+			continue
+		}
+
+		if !ok {
+			entry.key = ""
+		}
+
+		outbox <- entry
+	}
 }
 
 // Skip skips a number of values from the range.

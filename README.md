@@ -56,7 +56,7 @@ func main() {
 
 - Indexes.
 - Compound indexes.
-- Multi-indexes.
+- Multi-indexes (tags).
 - All range queries are sorted (ascending by default).
 - Uses [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
 - All range queries are buffered in the background, 100 results at a time.
@@ -128,49 +128,6 @@ func main() {
 		// Doesn't decode the entire document, makes filtering faster!
 		return doc.QueryInt("Age") >= 13
 	})
-
-	var person Person
-	r.Next(&person)
-	fmt.Printf("%+v\n", person) // Should print Brock's information
-}
-```
-
-### Between on an index
-
-The same example as above, but faster with indexes:
-
-```go
-package main
-
-import (
-	"github.com/1lann/cete"
-	"fmt"
-)
-
-type Person struct {
-	Name string
-	Age int
-}
-
-func main() {
-	db, _ := cete.Open("./cete_data")
-
-	defer db.Close()
-
-	db.NewTable("people")
-	db.Table("people").Set("ash", Person{
-		Name: "Ash Ketchum",
-		Age: 10,
-	})
-	db.Table("people").Set("brock", Person{
-		Name: "Brock",
-		Age: 15,
-	})
-
-	db.Table("people").NewIndex("Age")
-
-	// Find who is no younger than 13. This would also be sorted ascending by age.
-	r := db.Table("people").Index("Age").Between(13, cete.MaxValue)
 
 	var person Person
 	r.Next(&person)

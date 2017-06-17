@@ -188,6 +188,7 @@ func TestMultiIndex(t *testing.T) {
 	}
 
 	r, err = db.Table("index_testing").Index("Likes.*").GetAll("js")
+	panicNotNil(err)
 
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])

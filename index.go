@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/dgraph-io/badger/badger"
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -12,11 +13,18 @@ import (
 // Bounds is the type for variables which represent a bound for Between.
 type Bounds int
 
-// Valid bounds.
+// Minimum and maximum values.
 var (
-	MinValue Bounds = 1
-	MaxValue Bounds = 2
+	MinValue Bounds = (-1 << 63)
+	MaxValue Bounds = (1 << 63) - 1
+	MaxBytes        = make([]byte, 256)
 )
+
+func init() {
+	for i := range MaxBytes {
+		MaxBytes[i] = 0xff
+	}
+}
 
 // NewIndex creates a new index on the table, using the name as the Query.
 // The index name must not be empty, and must be no more than 125 bytes
@@ -47,7 +55,6 @@ func (t *Table) NewIndex(name string) error {
 	}
 
 	if tableConfigKey < 0 {
-		log.Println("cete: attempt to call new index on a non-existent table")
 		t.db.configMutex.Unlock()
 		return ErrNotFound
 	}
@@ -99,7 +106,7 @@ func (i *Index) indexValues(name string) error {
 			return entry.err
 		}
 
-		results, err = msgpack.NewDecoder(bytes.NewReader(entry.data)).Query(name)
+		results, err = indexQuery(entry.data, name)
 		if err != nil {
 			continue
 		}
@@ -113,6 +120,32 @@ func (i *Index) indexValues(name string) error {
 	}
 
 	return nil
+}
+
+func indexQuery(data []byte, query string) ([]interface{}, error) {
+	rd := bytes.NewReader(data)
+	dec := msgpack.NewDecoder(rd)
+
+	queries := strings.Split(query, ",")
+	if len(queries) > 1 {
+		results := make([]interface{}, len(queries))
+
+		for i, q := range queries {
+			res, err := dec.Query(q)
+			if err != nil {
+				return nil, err
+			}
+
+			rd.Reset(data)
+			dec.Reset(rd)
+
+			results[i] = res[0]
+		}
+
+		return []interface{}{results}, nil
+	}
+
+	return dec.Query(query)
 }
 
 // One puts the first matching value with the index's key into dst. dst
@@ -198,6 +231,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 // reverse the sorting by specifying true to the optional reverse parameter.
 // The bounds are inclusive on both ends. It is possible to have
 // duplicate documents if the same document has multiple unique index values.
+// To remove filter duplicate documents, use `Unique()` on the Range.
 //
 // You can use cete.MinValue and cete.MaxValue to specify minimum and maximum
 // bound values.

@@ -154,10 +154,8 @@ func (t *Table) diffIndexes(old, new []byte) ([]diffEntry, []diffEntry) {
 	var additions []diffEntry
 
 	for indexName := range t.indexes {
-		oldRawValues, _ := msgpack.NewDecoder(bytes.NewReader(old)).
-			Query(string(indexName))
-		newRawValues, _ := msgpack.NewDecoder(bytes.NewReader(new)).
-			Query(string(indexName))
+		oldRawValues, _ := indexQuery(old, string(indexName))
+		newRawValues, _ := indexQuery(new, string(indexName))
 
 		if oldRawValues == nil || len(old) == 0 {
 			oldRawValues = []interface{}{}

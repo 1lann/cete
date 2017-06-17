@@ -1,6 +1,7 @@
 package cete
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -121,5 +122,28 @@ func TestUpdateErrors(t *testing.T) {
 		func(c Counter) (Counter, error) { return Counter{}, nil })
 	if err != ErrNotFound {
 		t.Fatal("error should be ErrNotFound, but isn't")
+	}
+
+	err = db.Table("table_update").Update("test",
+		func(c func()) (Counter, error) { return Counter{}, nil })
+	if err == nil {
+		t.Fatal("error should not be nil, but is")
+	}
+
+	err = db.Table("table_update").Update("test",
+		func(c Counter) (func(), error) { return func() {}, nil })
+	if err == nil {
+		t.Fatal("error should not be nil, but is")
+	}
+
+	err = db.Table("table_update").Update("test",
+		func(c Counter) (Counter, error) { return c, nil })
+	panicNotNil(err)
+
+	testError := errors.New("cete testing: test error")
+	err = db.Table("table_update").Update("test",
+		func(c Counter) (Counter, error) { return c, testError })
+	if err != testError {
+		t.Fatal("error should be testError, but isn't")
 	}
 }

@@ -15,7 +15,9 @@ type Person struct {
 	City   string
 	Age    int
 	Height float64
+	Likes  []string
 	DOB    time.Time
+	Data   []byte
 }
 
 func (a Person) IsSame(b Person) bool {
@@ -811,18 +813,193 @@ func TestOrdering(t *testing.T) {
 		t.Fatal("time should obey reflexive property of equality, but isn't")
 	}
 
-	if bytes.Compare(valueToBytes(12.34),
-		valueToBytes(12.35)) >= 0 {
-		t.Fatal("now should be less than a minute in a future, but isn't")
+	if bytes.Compare(valueToBytes(12.34), valueToBytes(12.35)) >= 0 {
+		t.Fatal("12.34 should come before 12.35, but doesn't")
 	}
 
-	if bytes.Compare(valueToBytes(12.35),
-		valueToBytes(12.34)) <= 0 {
-		t.Fatal("now should be less than a minute in a future, but isn't")
+	if bytes.Compare(valueToBytes(12.35), valueToBytes(12.34)) <= 0 {
+		t.Fatal("12.35 should come after 12.34, but doesn't")
 	}
 
 	if bytes.Compare(valueToBytes(12.34), valueToBytes(12.34)) != 0 {
-		t.Fatal("time should obey reflexive property of equality, but isn't")
+		t.Fatal("float64 should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(float32(12.34)),
+		valueToBytes(float32(12.35))) >= 0 {
+		t.Fatal("12.34 should come before 12.35, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(float32(12.35)),
+		valueToBytes(float32(12.34))) <= 0 {
+		t.Fatal("12.35 should come after 12.34, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(float32(12.34)),
+		valueToBytes(float32(12.34))) != 0 {
+		t.Fatal("float64 should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint32(1)), valueToBytes(uint32(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint32(2)), valueToBytes(uint32(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint32(2)), valueToBytes(uint32(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint16(1)), valueToBytes(uint16(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint16(2)), valueToBytes(uint16(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint16(2)), valueToBytes(uint16(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint64(1)), valueToBytes(uint64(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint64(2)), valueToBytes(uint64(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(uint64(2)), valueToBytes(uint64(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(1), valueToBytes(2)) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(2), valueToBytes(1)) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(-1), valueToBytes(1)) >= 0 {
+		t.Fatal("-1 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(-1), valueToBytes(0)) >= 0 {
+		t.Fatal("-1 should be come before 0, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(0), valueToBytes(1)) >= 0 {
+		t.Fatal("0 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(2), valueToBytes(2)) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(1)), valueToBytes(int16(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(2)), valueToBytes(int16(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(-1)), valueToBytes(int16(1))) >= 0 {
+		t.Fatal("-1 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(-1)), valueToBytes(int16(0))) >= 0 {
+		t.Fatal("-1 should be come before 0, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(0)), valueToBytes(int16(1))) >= 0 {
+		t.Fatal("0 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int16(2)), valueToBytes(int16(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(1)), valueToBytes(int32(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(2)), valueToBytes(int32(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(-1)), valueToBytes(int32(1))) >= 0 {
+		t.Fatal("-1 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(-1)), valueToBytes(int32(0))) >= 0 {
+		t.Fatal("-1 should be come before 0, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(0)), valueToBytes(int32(1))) >= 0 {
+		t.Fatal("0 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int32(2)), valueToBytes(int32(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(1)), valueToBytes(int64(2))) >= 0 {
+		t.Fatal("1 should be come before 2, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(2)), valueToBytes(int64(1))) <= 0 {
+		t.Fatal("2 should be come after 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(-1)), valueToBytes(int64(1))) >= 0 {
+		t.Fatal("-1 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(-1)), valueToBytes(int64(0))) >= 0 {
+		t.Fatal("-1 should be come before 0, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(0)), valueToBytes(int64(1))) >= 0 {
+		t.Fatal("0 should be come before 1, but doesn't")
+	}
+
+	if bytes.Compare(valueToBytes(int64(2)), valueToBytes(int64(2))) != 0 {
+		t.Fatal("number should obey reflexive property of equality, but doesn't")
+	}
+
+	minVal := valueToBytes(MinValue)
+	if !(minVal[0] == 0 && minVal[1] == 0 && minVal[2] == 0 && minVal[3] == 0 &&
+		minVal[4] == 0 && minVal[5] == 0 && minVal[6] == 0 && minVal[7] == 0) {
+		t.Fatal("MinValue should be represented as 0, but isn't")
+	}
+
+	maxVal := valueToBytes(MaxValue)
+	if !(maxVal[0] == 0xff && maxVal[1] == 0xff && maxVal[2] == 0xff && maxVal[3] == 0xff &&
+		maxVal[4] == 0xff && maxVal[5] == 0xff && maxVal[6] == 0xff && maxVal[7] == 0xff) {
+		t.Fatal("MaxValue should be represented as 0xffffffffffffffff, but isn't")
+	}
+
+	b := []byte{1, 2, 3, 4, 5, 6}
+	if bytes.Compare(valueToBytes(b), b) != 0 {
+		t.Fatal("bytes should be the same, but isn't")
+	}
+
+	if len(valueToBytes(b, true)) != indexedBytesSize {
+		t.Fatal("bytes should be indexedBytesSize long, but isn't")
+	}
+
+	b = make([]byte, 300)
+	for i := 0; i < 300; i++ {
+		b[i] = byte(i % 200)
+	}
+
+	if bytes.Compare(valueToBytes([]interface{}{b}), b[:indexedBytesSize]) != 0 {
+		t.Fatal("bytes should be the same, but isn't")
 	}
 }
 
@@ -940,6 +1117,10 @@ func TestIndexLoading(t *testing.T) {
 		t.Fatal("person should be same as jason, but isn't")
 	}
 
+	if db.Table("index_testing").Index("Age").name() != "index_testing/Age" {
+		t.Fatal("index name should be index_testing/Age, but isn't")
+	}
+
 	err = db.Table("index_testing").Index("Age").Drop()
 	panicNotNil(err)
 
@@ -1034,5 +1215,108 @@ func TestIndexDelete(t *testing.T) {
 
 	if !person.IsSame(people["jason"]) {
 		t.Fatal("person should be same as jason, but isn't")
+	}
+}
+
+func TestSmallIndex(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
+	defer func() {
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
+	}()
+
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
+
+	defer db.Close()
+
+	err = db.NewTable("index_testing")
+	panicNotNil(err)
+
+	panicNotNil(db.Table("index_testing").Set("a", Person{
+		Name: "",
+	}))
+
+	panicNotNil(db.Table("index_testing").NewIndex("Name"))
+
+	if db.Table("index_testing").Index("Name").CountBetween(MinValue, MaxValue) != 1 {
+		t.Fatal("count should be 1, but isn't")
+	}
+
+	if decodeArrayCount([]byte{0}) != 0 {
+		t.Fatal("count should be 0, but isn't")
+	}
+}
+
+func TestIndexAll(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
+	defer func() {
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
+	}()
+
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
+
+	defer db.Close()
+
+	err = db.NewTable("index_testing")
+	panicNotNil(err)
+
+	panicNotNil(db.Table("index_testing").Set("a", map[string]string{
+		"Name": "Jason",
+	}))
+
+	panicNotNil(db.Table("index_testing").Set("b", map[string]string{
+		"Name": "Alex",
+	}))
+
+	panicNotNil(db.Table("index_testing").Set("c", map[string]string{
+		"NotName": "Bob",
+	}))
+
+	panicNotNil(db.Table("index_testing").NewIndex("Name"))
+
+	r := db.Table("index_testing").Index("Name").All()
+
+	type pp struct {
+		Name    string
+		NotName string
+	}
+
+	var result pp
+	key, _, err := r.Next(&result)
+	panicNotNil(err)
+
+	if key != "b" || result.Name != "Alex" || result.NotName != "" {
+		t.Fatal("result should be Alex, but isn't")
+	}
+
+	key, _, err = r.Next(&result)
+	panicNotNil(err)
+
+	if key != "a" || result.Name != "Jason" || result.NotName != "" {
+		t.Fatal("result should be Jason, but isn't")
+	}
+
+	_, _, err = r.Next(&result)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 }

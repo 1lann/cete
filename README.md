@@ -10,7 +10,7 @@
 >
 >A group of badgers.
 
-Cete is a simple, lightweight database abstraction layer of [Badger](https://github.com/dgraph-io/badger) for  use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
+Cete is a simple, lightweight, pure Go database abstraction layer of [Badger](https://github.com/dgraph-io/badger) for use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
 **This is just a personal hobby project, I may not maintain this! I just wanted to make my own database for fun.**
 
@@ -64,6 +64,13 @@ func main() {
 - Thread safe.
 - Pure Go.
 - Uses the fastest pure Go key-value store in the world 😉.
+
+## Important limitations
+
+- When indexed, strings are case unsensitized using `strings.ToLower`. If you don't want this behavior, use a byte slice instead.
+- When working with compound indexes, an individual string or byte slice in the compound index is limited to 256 bytes, and will be trimmed if it is over 256 bytes. This limitation is not present in normal indexes that are purely a string or byte slice.
+- Indexing with numbers above maximum int64 is unsupported and will result in undefined behavior when using `Between`. Note that it's fine to index uint64, just values over max int64 (9,223,372,036,854,775,807) will result in issues when using `Between`.
+- When working with compound indexes, you may use `MaxValue` and `MinValue` as maximum integers or minimum integers of any size and float64s. This however cannot be be used for float32.
 
 ## Documentation
 
@@ -174,7 +181,7 @@ func main() {
 
 ## FAQ
 ### What happens if a document is missing the attribute for an index?
-The index is skipped for that document! The document won't ever appear in the index.
+The index is skipped for that document! The document won't ever appear in the index. This also applies to compound indexes, if any of the queries for the compound index fails/results in nil, the document won't be indexed for that compound index.
 
 ### Are there transactions?
 No, this library is meant to be a very simple and basic abstraction layer of Badger, and Badger does not support transactions.

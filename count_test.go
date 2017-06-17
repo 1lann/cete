@@ -1,6 +1,7 @@
 package cete
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -116,6 +117,17 @@ func TestCounting(t *testing.T) {
 
 	if db.Table("count_testing").Index("Age").CountBetween(10000, MaxValue) != 0 {
 		t.Fatal("count should be 0, but isn't")
+	}
+
+	countError := errors.New("cete testing: count error")
+
+	r := newRange(func() (string, []byte, int, error) {
+		return "", nil, 0, countError
+	}, func() {})
+
+	_, err = r.Count()
+	if err != countError {
+		t.Fatal("error should be countError, but isn't")
 	}
 }
 

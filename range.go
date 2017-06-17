@@ -132,3 +132,26 @@ func (r *Range) Count() (int64, error) {
 		count++
 	}
 }
+
+// Unique will remove all duplicate entries from the range. It does this by
+// saving all of the seen keys to a map. If there are a lot of unique keys,
+// Unique may use a lot of memory.
+func (r *Range) Unique() *Range {
+	var entry bufferEntry
+	seen := make(map[string]bool)
+
+	return newRange(func() (string, []byte, int, error) {
+		for {
+			entry = <-r.buffer
+
+			if entry.err != nil {
+				return entry.key, entry.data, entry.counter, entry.err
+			}
+
+			if !seen[entry.key] {
+				seen[entry.key] = true
+				return entry.key, entry.data, entry.counter, entry.err
+			}
+		}
+	}, r.Close)
+}

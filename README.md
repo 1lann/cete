@@ -79,6 +79,12 @@ Find documentation on [GoDoc](https://godoc.org/github.com/1lann/cete).
 
 Examples can be found on the [wiki](https://github.com/1lann/cete/wiki).
 
+## Todo
+
+- [ ] Transparent key compression
+- [ ] Concurrent indexing to speed up index creation
+- [ ] Write more examples
+
 ## Performance
 
 I've performed some benchmarks comparing Cete to two other pure Go database wrappers, [Storm](https://github.com/asdine/storm) and [BoltHold](https://github.com/timshannon/bolthold). The source code for this benchmark can be found [here](https://github.com/1lann/db-benchmark).
@@ -90,50 +96,6 @@ These benchmarks consists of simple sets and gets. However the gets were by seco
 ![Cete benchmarks](https://chuie.io/cete.png)
 
 Cete is typically twice as fast as Storm for concurrent operations, and BoltHold was magnitudes slower than either. Cete is actually quite slow when it comes to sequential write operations (and isn't shown here), so it's strongly recommended to write concurrently. Cete also fairs similarly to Storm with sequential reads.
-
-### Filtering
-
-Here's an example of filtering:
-
-```go
-package main
-
-import (
-	"github.com/1lann/cete"
-	"fmt"
-)
-
-type Person struct {
-	Name string
-	Age int
-}
-
-func main() {
-	db, _ := cete.Open("./cete_data")
-
-	defer db.Close()
-
-	db.NewTable("people")
-	db.Table("people").Set("ash", Person{
-		Name: "Ash Ketchum",
-		Age: 10,
-	})
-	db.Table("people").Set("brock", Person{
-		Name: "Brock",
-		Age: 15,
-	})
-
-	// Find who is no younger than 13
-	r := db.Table("people").All().Filter(func(doc cete.Document) bool {
-		// Doesn't decode the entire document, makes filtering faster!
-		return doc.QueryInt("Age") >= 13
-	})
-
-	var person Person
-	r.Next(&person)
-	fmt.Printf("%+v\n", person) // Should print Brock's information
-}
-```
 
 ## FAQ
 ### What happens if a document is missing the attribute for an index?

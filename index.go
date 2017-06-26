@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger/badger"
-	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 // Bounds is the type for variables which represent a bound for Between.
@@ -17,14 +17,7 @@ type Bounds int
 var (
 	MinValue Bounds = (-1 << 63)
 	MaxValue Bounds = (1 << 63) - 1
-	MaxBytes        = make([]byte, 256)
 )
-
-func init() {
-	for i := range MaxBytes {
-		MaxBytes[i] = 0xff
-	}
-}
 
 // NewIndex creates a new index on the table, using the name as the Query.
 // The index name must not be empty, and must be no more than 125 bytes
@@ -33,6 +26,7 @@ func init() {
 // NewIndex may take a while if there are already values in the
 // table, as it needs to index all the existing values in the table.
 func (t *Table) NewIndex(name string) error {
+	// TODO: Implement concurrent indexing
 	if name == "" || len(name) > 125 {
 		return ErrBadIdentifier
 	}
@@ -106,7 +100,7 @@ func (i *Index) indexValues(name string) error {
 			return entry.err
 		}
 
-		results, err = indexQuery(entry.data, name)
+		results, err = i.indexQuery(entry.data, name)
 		if err != nil {
 			continue
 		}
@@ -122,16 +116,24 @@ func (i *Index) indexValues(name string) error {
 	return nil
 }
 
-func indexQuery(data []byte, query string) ([]interface{}, error) {
+func (i *Index) indexQuery(data []byte, query string) ([]interface{}, error) {
 	rd := bytes.NewReader(data)
 	dec := msgpack.NewDecoder(rd)
+
+	compressed := i.table.keyToCompressed != nil
 
 	queries := strings.Split(query, ",")
 	if len(queries) > 1 {
 		results := make([]interface{}, len(queries))
 
-		for i, q := range queries {
-			res, err := dec.Query(q)
+		var res []interface{}
+		var err error
+		for it, q := range queries {
+			if compressed {
+				res, err = dec.QueryCompressed(i.table.keyToC, q)
+			} else {
+				res, err = dec.Query(q)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -139,10 +141,14 @@ func indexQuery(data []byte, query string) ([]interface{}, error) {
 			rd.Reset(data)
 			dec.Reset(rd)
 
-			results[i] = res[0]
+			results[it] = res[0]
 		}
 
 		return []interface{}{results}, nil
+	}
+
+	if compressed {
+		return dec.QueryCompressed(i.table.keyToC, query)
 	}
 
 	return dec.Query(query)
@@ -223,7 +229,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 			c++
 			return keys[c-1], value, int(item.Counter()), nil
 		}
-	}, func() {}), nil
+	}, func() {}, i.table), nil
 }
 
 // Between returns a Range of documents between the lower and upper index values
@@ -239,7 +245,7 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 	if lower == MaxValue || upper == MinValue {
 		return newRange(func() (string, []byte, int, error) {
 			return "", nil, 0, ErrEndOfRange
-		}, func() {})
+		}, func() {}, nil)
 	}
 
 	shouldReverse := (len(reverse) > 0) && reverse[0]
@@ -274,7 +280,7 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 				lastRange.Close()
 			}
 			it.Close()
-		})
+		}, i.table)
 }
 
 // CountBetween returns the number of documents whose index values are

@@ -57,9 +57,10 @@ func main() {
 - Indexes.
 - Compound indexes.
 - Multi-indexes (tags).
+- Transparent key compression.
 - All range queries are sorted (ascending by default).
-- Uses [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
-- All range queries are buffered in the background, 100 results at a time.
+- Uses a [custom version](https://github.com/1lann/msgpack) of [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
+- Efficient, concurrent range retrievers, filters, and index generation.
 - Supports filtering.
 - Lockless read/writes. Achieve safe updates with `Update` and counters.
 - Schemaless!
@@ -71,6 +72,7 @@ func main() {
 
 - When indexed, strings are case unsensitized using `strings.ToLower`. If you don't want this behavior, use a byte slice instead.
 - Indexing with numbers above maximum int64 is unsupported and will result in undefined behavior when using `Between`. Note that it's fine to index uint64, just values over max int64 (9,223,372,036,854,775,807) will result in issues when using `Between`.
+- If your documents' keys have any of the following characters: `.,*`, `Query` will not work on them. Use `Decode` instead.
 - When working with compound indexes, you may use `MaxValue` and `MinValue` as maximum integers or minimum integers of any size and float64s. This however cannot be be used for float32.
 
 ## Documentation and examples

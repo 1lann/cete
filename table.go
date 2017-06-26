@@ -6,15 +6,26 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"runtime/debug"
+	"sync"
 
+	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger/badger"
-	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
-// NewTable creates a new table in the database.
-func (d *DB) NewTable(name string) error {
+// NewTable creates a new table in the database. You can optionally specify
+// to disable transparent key compression by setting the second parameter to
+// false. Transparent key compression is enabled by default. Disable it if your
+// the keys in your document are very dynamic, as the key compression map
+// is stored in memory.
+func (d *DB) NewTable(name string, keyCompression ...bool) error {
 	if name == "" || len(name) > 125 {
 		return ErrBadIdentifier
+	}
+
+	useKeyCompression := true
+	if len(keyCompression) > 0 {
+		useKeyCompression = keyCompression[0]
 	}
 
 	d.configMutex.Lock()
@@ -31,16 +42,28 @@ func (d *DB) NewTable(name string) error {
 		return err
 	}
 
-	d.config.Tables = append(d.config.Tables, tableConfig{TableName: name})
+	d.config.Tables = append(d.config.Tables, tableConfig{
+		TableName:         name,
+		UseKeyCompression: useKeyCompression,
+	})
 	if err := d.writeConfig(); err != nil {
 		return err
 	}
 
-	d.tables[Name(name)] = &Table{
+	tb := &Table{
 		indexes: make(map[Name]*Index),
 		data:    kv,
 		db:      d,
 	}
+
+	if useKeyCompression {
+		tb.compressionLock = new(sync.RWMutex)
+		tb.keyToCompressed = make(map[string]string)
+		tb.compressedToKey = make(map[string]string)
+		tb.nextKey = "0"
+	}
+
+	d.tables[Name(name)] = tb
 
 	return nil
 }
@@ -102,6 +125,10 @@ func (t *Table) Get(key string, dst interface{}) (int, error) {
 		return int(item.Counter()), nil
 	}
 
+	if t.keyToCompressed != nil {
+		return int(item.Counter()), msgpack.UnmarshalCompressed(t.cToKey, item.Value(), dst)
+	}
+
 	return int(item.Counter()), msgpack.Unmarshal(item.Value(), dst)
 }
 
@@ -120,7 +147,12 @@ func (t *Table) Set(key string, value interface{}, counter ...int) error {
 		}
 	}
 
-	data, err := msgpack.Marshal(value)
+	var data []byte
+	if t.keyToCompressed != nil {
+		data, err = msgpack.MarshalCompressed(t.keyToC, value)
+	} else {
+		data, err = msgpack.Marshal(value)
+	}
 	if err != nil {
 		return err
 	}
@@ -153,9 +185,9 @@ func (t *Table) diffIndexes(old, new []byte) ([]diffEntry, []diffEntry) {
 	var removals []diffEntry
 	var additions []diffEntry
 
-	for indexName := range t.indexes {
-		oldRawValues, _ := indexQuery(old, string(indexName))
-		newRawValues, _ := indexQuery(new, string(indexName))
+	for indexName, index := range t.indexes {
+		oldRawValues, _ := index.indexQuery(old, string(indexName))
+		newRawValues, _ := index.indexQuery(new, string(indexName))
 
 		if oldRawValues == nil || len(old) == 0 {
 			oldRawValues = []interface{}{}
@@ -465,7 +497,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	if lower == MaxValue || upper == MinValue {
 		return newRange(func() (string, []byte, int, error) {
 			return "", nil, 0, ErrEndOfRange
-		}, func() {})
+		}, func() {}, nil)
 	}
 
 	shouldReverse := (len(reverse) > 0) && reverse[0]
@@ -483,7 +515,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 			"been returned instead")
 		return newRange(func() (string, []byte, int, error) {
 			return "", nil, 0, ErrEndOfRange
-		}, func() {})
+		}, func() {}, nil)
 	}
 
 	lowerString, isString := lower.(string)
@@ -494,7 +526,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 			"been returned instead")
 		return newRange(func() (string, []byte, int, error) {
 			return "", nil, 0, ErrEndOfRange
-		}, func() {})
+		}, func() {}, nil)
 	}
 
 	upperBytes := []byte(upperString)
@@ -537,7 +569,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 		}
 
 		return "", nil, 0, ErrEndOfRange
-	}, it.Close)
+	}, it.Close, t)
 }
 
 // CountBetween returns the number of documents whose key values are
@@ -610,4 +642,90 @@ func (t *Table) Indexes() []string {
 	}
 
 	return indexes
+}
+
+func incrementKey(key string) string {
+	byteKey := []byte(key)
+	for i, letter := range byteKey {
+		if letter < '~' {
+			byteKey[i] = letter + 1
+			return string(byteKey)
+		} else {
+			byteKey[i] = '0'
+		}
+	}
+
+	byteKey = append(byteKey, '0')
+	return string(byteKey)
+}
+
+func (t *Table) keyToC(key string, noGenerate ...bool) (string, error) {
+	t.compressionLock.RLock()
+
+	shouldGenerate := true
+	if len(noGenerate) > 0 && noGenerate[0] {
+		shouldGenerate = false
+	}
+
+	if value, found := t.keyToCompressed[key]; found {
+		t.compressionLock.RUnlock()
+		return value, nil
+	}
+	t.compressionLock.RUnlock()
+
+	if !shouldGenerate {
+		return "", ErrNotFound
+	}
+
+	t.compressionLock.Lock()
+	defer t.compressionLock.Unlock()
+
+	if value, found := t.keyToCompressed[key]; found {
+		return value, nil
+	}
+
+	newKey := t.nextKey
+	t.keyToCompressed[key] = newKey
+	t.compressedToKey[newKey] = key
+	t.nextKey = incrementKey(newKey)
+
+	if err := t.writeCompressedKeys(); err != nil {
+		delete(t.keyToCompressed, key)
+		delete(t.compressedToKey, newKey)
+		t.nextKey = newKey
+		return "", err
+	}
+
+	return newKey, nil
+}
+
+func (t *Table) writeCompressedKeys() error {
+	t.db.configMutex.Lock()
+	defer t.db.configMutex.Unlock()
+
+	tableName := t.name()
+	for i, table := range t.db.config.Tables {
+		if table.TableName == tableName {
+			t.db.config.Tables[i].KeyCompression = t.keyToCompressed
+			t.db.config.Tables[i].NextKey = t.nextKey
+			return t.db.writeConfig()
+		}
+	}
+
+	return ErrNotFound
+}
+
+func (t *Table) cToKey(compressed string) string {
+	t.compressionLock.RLock()
+	defer t.compressionLock.RUnlock()
+
+	value, found := t.compressedToKey[compressed]
+	if !found {
+		log.Println("cete: warning: failed to decompress non-existent "+
+			"compressed key:", compressed)
+		log.Println(string(debug.Stack()))
+		return compressed
+	}
+
+	return value
 }

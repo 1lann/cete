@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger/badger"
-	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 // Common errors that can be returned
@@ -46,6 +46,11 @@ type Table struct {
 	indexes map[Name]*Index
 	data    *badger.KV
 	db      *DB
+
+	compressionLock *sync.RWMutex
+	keyToCompressed map[string]string
+	compressedToKey map[string]string
+	nextKey         string
 }
 
 // DB represents the database.
@@ -124,7 +129,10 @@ func valueToBytes(value interface{}) (b []byte) {
 }
 
 // Document represents the value of a document.
-type Document []byte
+type Document struct {
+	data  []byte
+	table *Table
+}
 
 // QueryInt returns the int value of a QueryOne assumed to contain an int.
 func (v Document) QueryInt(query string) int {
@@ -182,14 +190,13 @@ func (v Document) QueryTime(query string) time.Time {
 	if !ok {
 		return time.Time{}
 	}
-
 	return time.Unix(int64(t[0].(uint64)), int64(t[1].(uint64)))
 }
 
 // QueryOne returns the first matching value of a msgpack query.
 func (v Document) QueryOne(query string) interface{} {
-	results, err := msgpack.NewDecoder(bytes.NewReader([]byte(v))).Query(query)
-	if err != nil || len(results) == 0 {
+	results := v.QueryAll(query)
+	if len(results) == 0 {
 		return nil
 	}
 
@@ -198,15 +205,26 @@ func (v Document) QueryOne(query string) interface{} {
 
 // QueryAll returns the first matching value of a msgpack query.
 func (v Document) QueryAll(query string) []interface{} {
-	results, err := msgpack.NewDecoder(bytes.NewReader([]byte(v))).Query(query)
+	var results []interface{}
+	var err error
+	if v.table != nil && v.table.keyToCompressed != nil {
+		results, err = msgpack.NewDecoder(bytes.NewReader(v.data)).
+			QueryCompressed(v.table.keyToC, query)
+	} else {
+		results, err = msgpack.NewDecoder(bytes.NewReader(v.data)).Query(query)
+	}
+
 	if err != nil || len(results) == 0 {
 		return nil
 	}
-
 	return results
 }
 
 // Decode attempts to decodes the document to an interface using reflection.
 func (v Document) Decode(dst interface{}) error {
-	return msgpack.Unmarshal([]byte(v), dst)
+	if v.table != nil && v.table.keyToCompressed != nil {
+		return msgpack.UnmarshalCompressed(v.table.cToKey, v.data, dst)
+	}
+
+	return msgpack.Unmarshal(v.data, dst)
 }

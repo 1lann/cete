@@ -1,9 +1,12 @@
 package cete
 
 import (
+	"errors"
+	"reflect"
+	"sync"
 	"sync/atomic"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/1lann/msgpack"
 )
 
 const bufferSize = 100
@@ -22,6 +25,8 @@ type Range struct {
 	next   func() (string, []byte, int, error)
 	close  func()
 	closed int32
+
+	table *Table
 }
 
 // Next stores the next item in the range into dst. dst must be a pointer
@@ -38,10 +43,94 @@ func (r *Range) Next(dst interface{}) (string, int, error) {
 	}
 
 	if dst != nil {
+		if r.table != nil && r.table.keyToCompressed != nil {
+			return entry.key, entry.counter,
+				msgpack.UnmarshalCompressed(r.table.cToKey, entry.data, dst)
+		}
+
 		return entry.key, entry.counter, msgpack.Unmarshal(entry.data, dst)
 	}
 
 	return entry.key, entry.counter, nil
+}
+
+// All stores all of the results into slice dst provided by as a pointer.
+// A nil error will be returned if the range reaches ErrEndOfRange.
+func (r *Range) All(dst interface{}) error {
+	// Code baseed on github.com/GoRethink/gorethink's `Cursor.All`.
+	slicePtr := reflect.ValueOf(dst)
+	if slicePtr.Kind() != reflect.Ptr ||
+		slicePtr.Elem().Kind() != reflect.Slice {
+		return errors.New("cete: dst must be a pointer to a silce")
+	}
+
+	sliceValue := slicePtr.Elem()
+	sliceValue = sliceValue.Slice(0, sliceValue.Cap())
+	elemType := sliceValue.Type().Elem()
+	i := 0
+	compressed := r.table != nil && r.table.keyToCompressed != nil
+
+	defer func() {
+		slicePtr.Elem().Set(sliceValue.Slice(0, i))
+	}()
+
+	var err error
+	for {
+		entry, more := <-r.buffer
+		if !more {
+			return nil
+		}
+
+		if entry.err == ErrEndOfRange {
+			return nil
+		} else if entry.err != nil {
+			return entry.err
+		}
+
+		if sliceValue.Len() == i {
+			thisElem := reflect.New(elemType)
+
+			if compressed {
+				err = msgpack.UnmarshalCompressed(r.table.cToKey, entry.data,
+					thisElem.Interface())
+			} else {
+				err = msgpack.Unmarshal(entry.data, thisElem.Interface())
+			}
+			if err != nil {
+				return err
+			}
+
+			sliceValue = reflect.Append(sliceValue, thisElem.Elem())
+			sliceValue = sliceValue.Slice(0, sliceValue.Cap())
+		} else {
+			if compressed {
+				err = msgpack.UnmarshalCompressed(r.table.cToKey, entry.data,
+					sliceValue.Index(i).Addr().Interface())
+			} else {
+				err = msgpack.Unmarshal(entry.data,
+					sliceValue.Index(i).Addr().Interface())
+			}
+			if err != nil {
+				return err
+			}
+		}
+		i++
+	}
+}
+
+// Limit limits the number of documents that can be read from the range.
+// When this limit is reached, ErrEndOfRange will be returned.
+func (r *Range) Limit(n int64) *Range {
+	return newRange(func() (string, []byte, int, error) {
+		entry := <-r.buffer
+
+		if n <= 0 {
+			return "", nil, 0, ErrEndOfRange
+		}
+		n--
+
+		return entry.key, entry.data, entry.counter, entry.err
+	}, r.Close, r.table)
 }
 
 // Close closes the range. The range will automatically close upon the
@@ -52,11 +141,13 @@ func (r *Range) Close() {
 	}
 }
 
-func newRange(next func() (string, []byte, int, error), closer func()) *Range {
+func newRange(next func() (string, []byte, int, error), closer func(),
+	table *Table) *Range {
 	r := &Range{
 		buffer: make(chan bufferEntry, bufferSize),
 		next:   next,
 		close:  closer,
+		table:  table,
 	}
 
 	go func() {
@@ -99,7 +190,7 @@ func (r *Range) Filter(filter func(doc Document) (bool, error),
 	for i := range inboxes {
 		inboxes[i] = make(chan *bufferEntry)
 		outboxes[i] = make(chan *bufferEntry)
-		go filterWorker(filter, inboxes[i], outboxes[i])
+		go filterWorker(filter, r.table, inboxes[i], outboxes[i])
 	}
 
 	go func() {
@@ -137,11 +228,11 @@ func (r *Range) Filter(filter func(doc Document) (bool, error),
 
 			return entry.key, entry.data, entry.counter, entry.err
 		}
-	}, r.Close)
+	}, r.Close, r.table)
 }
 
 func filterWorker(filter func(doc Document) (bool, error),
-	inbox chan *bufferEntry, outbox chan *bufferEntry) {
+	table *Table, inbox chan *bufferEntry, outbox chan *bufferEntry) {
 	var entry *bufferEntry
 	var ok bool
 	var err error
@@ -158,7 +249,10 @@ func filterWorker(filter func(doc Document) (bool, error),
 			continue
 		}
 
-		ok, err = filter(Document(entry.data))
+		ok, err = filter(Document{
+			data:  entry.data,
+			table: table,
+		})
 		if err != nil {
 			entry.err = err
 			outbox <- entry
@@ -173,18 +267,125 @@ func filterWorker(filter func(doc Document) (bool, error),
 	}
 }
 
-// Skip skips a number of values from the range.
-// The first encountered error while skipping will be returned.
-func (r *Range) Skip(n int) error {
+// Do applies a operation onto the range concurrently. Order is not guaranteed.
+// If the operation returns an error, Do will stop and return the error.
+// An error with the operation may not stop Do immediately, as the range buffer
+// must be exhausted first.
+// Errors during the range will also be returned. A nil error will be returned
+// if ErrEndOfRange is reached.
+//
+// You can optionally specify the number of workers to concurrently operate
+// on. By default the number of workers is 10.
+func (r *Range) Do(operation func(key string, counter int, doc Document) error,
+	workers ...int) error {
+
+	numWorkers := 10
+	if len(workers) > 0 && workers[0] != 0 {
+		numWorkers = workers[0]
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(numWorkers)
+
+	completion := make(chan error, numWorkers)
+	inboxes := make([]chan *bufferEntry, numWorkers)
+	for i := range inboxes {
+		inboxes[i] = make(chan *bufferEntry)
+		go doWorker(wg, operation, r.table, inboxes[i], completion)
+	}
+
+	go func() {
+		sendToWorker := 0
+
+		for {
+			entry, more := <-r.buffer
+			if !more {
+				break
+			}
+
+			inboxes[sendToWorker] <- &entry
+			sendToWorker = (sendToWorker + 1) % numWorkers
+		}
+
+		for _, inbox := range inboxes {
+			close(inbox)
+		}
+	}()
+
+	result := <-completion
+
+	if result == nil {
+		r.Close()
+		wg.Wait()
+
+		// Find errors
+		for {
+			select {
+			case err := <-completion:
+				if err != nil {
+					return err
+				}
+			default:
+				return nil
+			}
+		}
+	}
+
+	r.Close()
+	wg.Wait()
+	return result
+}
+
+func doWorker(wg *sync.WaitGroup, operation func(key string, counter int,
+	doc Document) error, table *Table, inbox chan *bufferEntry,
+	completion chan error) {
+	var entry *bufferEntry
+	var err error
+	var more bool
+
+	defer wg.Done()
+
+	for {
+		entry, more = <-inbox
+		if !more {
+			return
+		}
+
+		if entry.err == ErrEndOfRange {
+			completion <- nil
+			return
+		} else if entry.err != nil {
+			completion <- entry.err
+			return
+		}
+
+		err = operation(entry.key, entry.counter, Document{
+			data:  entry.data,
+			table: table,
+		})
+		if err != nil {
+			completion <- err
+
+			return
+		}
+	}
+}
+
+// Skip skips a number of values from the range, and returns back
+// the range. Any errors during skip will result in a range that
+// only returns that error.
+func (r *Range) Skip(n int) *Range {
 	var entry bufferEntry
 	for i := 0; i < n; i++ {
 		entry = <-r.buffer
 		if entry.err != nil {
-			return entry.err
+			return newRange(func() (string, []byte, int, error) {
+				return "", nil, 0, entry.err
+			}, func() {}, nil)
 		}
 	}
 
-	return nil
+	return r
 }
 
 // Count will count the number of elements in the range and consume the values
@@ -229,5 +430,5 @@ func (r *Range) Unique() *Range {
 				return entry.key, entry.data, entry.counter, entry.err
 			}
 		}
-	}, r.Close)
+	}, r.Close, r.table)
 }

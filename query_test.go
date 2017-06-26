@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/1lann/msgpack"
 )
 
 func TestQuery(t *testing.T) {
@@ -27,7 +27,10 @@ func TestQuery(t *testing.T) {
 
 	panicNotNil(err)
 
-	doc := Document(data)
+	doc := Document{
+		data:  data,
+		table: nil,
+	}
 
 	if string(doc.QueryBytes("Data")) != "hello" {
 		t.Fatal("query should be hello, but isn't")

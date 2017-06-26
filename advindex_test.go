@@ -11,6 +11,34 @@ func TestCompoundIndex(t *testing.T) {
 		t.Parallel()
 	}
 
+	testCompoundIndex(t, false)
+}
+
+func TestCompoundIndexCompressed(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testCompoundIndex(t, true)
+}
+
+func TestMultiIndex(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testMultiIndex(t, false)
+}
+
+func TestMultiIndexCompressed(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testMultiIndex(t, true)
+}
+
+func testCompoundIndex(t *testing.T, compression bool) {
 	people := map[string]Person{
 		"ben": {
 			Name: "Ben",
@@ -49,7 +77,7 @@ func TestCompoundIndex(t *testing.T) {
 
 	defer db.Close()
 
-	panicNotNil(db.NewTable("index_testing"))
+	panicNotNil(db.NewTable("index_testing", compression))
 
 	panicNotNil(db.Table("index_testing").NewIndex("Age,Name"))
 	panicNotNil(db.Table("index_testing").NewIndex("Name,Age"))
@@ -117,11 +145,7 @@ func TestCompoundIndex(t *testing.T) {
 	}
 }
 
-func TestMultiIndex(t *testing.T) {
-	if testing.Short() {
-		t.Parallel()
-	}
-
+func testMultiIndex(t *testing.T, compression bool) {
 	people := map[string]Person{
 		"ben": {
 			Name:  "Ben",
@@ -158,7 +182,7 @@ func TestMultiIndex(t *testing.T) {
 
 	defer db.Close()
 
-	panicNotNil(db.NewTable("index_testing"))
+	panicNotNil(db.NewTable("index_testing", compression))
 
 	panicNotNil(db.Table("index_testing").NewIndex("Likes.*"))
 

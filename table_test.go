@@ -2,6 +2,7 @@ package cete
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -65,9 +66,61 @@ func TestTableBetween(t *testing.T) {
 		panicNotNil(err)
 	}
 
-	r := db.Table("table_testing").Between(MinValue, MaxValue)
+	r := db.Table("table_testing").All().Limit(2)
 
 	var person Person
+
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("table_testing").All().Limit(1)
+
+	expectPerson("ben", r, people["ben"])
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("table_testing").All().Limit(3)
+
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
+	expectPerson("jason", r, people["jason"])
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("table_testing").All().Limit(4)
+
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
+	expectPerson("jason", r, people["jason"])
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("table_testing").All().Limit(1000)
+
+	expectPerson("ben", r, people["ben"])
+	expectPerson("drew", r, people["drew"])
+	expectPerson("jason", r, people["jason"])
+
+	_, _, err = r.Next(&person)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	r = db.Table("table_testing").Between(MinValue, MaxValue)
 
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
@@ -408,10 +461,12 @@ func TestTableCounter(t *testing.T) {
 	err = db.Table("table_testing").Set("jason", people["ben"], counter)
 	panicNotNil(err)
 
+	person = Person{}
 	counter, err = db.Table("table_testing").Get("jason", &person)
 	panicNotNil(err)
 
 	if !person.IsSame(people["ben"]) {
+		log.Println("this is person:", person)
 		t.Fatal("person should be same as ben, but isn't")
 	}
 

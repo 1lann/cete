@@ -14,6 +14,18 @@ func TestCounting(t *testing.T) {
 		t.Parallel()
 	}
 
+	testCounting(t, false)
+}
+
+func TestCountingCompressed(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testCounting(t, true)
+}
+
+func testCounting(t *testing.T, compression bool) {
 	dir, err := ioutil.TempDir("", "cete_")
 	panicNotNil(err)
 
@@ -29,7 +41,7 @@ func TestCounting(t *testing.T) {
 
 	defer db.Close()
 
-	err = db.NewTable("count_testing")
+	err = db.NewTable("count_testing", compression)
 	panicNotNil(err)
 
 	err = db.Table("count_testing").NewIndex("Age")
@@ -131,7 +143,7 @@ func TestCounting(t *testing.T) {
 
 	r := newRange(func() (string, []byte, int, error) {
 		return "", nil, 0, countError
-	}, func() {})
+	}, func() {}, nil)
 
 	_, err = r.Count()
 	if err != countError {

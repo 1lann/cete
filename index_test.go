@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/1lann/msgpack"
 )
 
 type Person struct {
@@ -401,6 +401,18 @@ func TestIndexBetween(t *testing.T) {
 		t.Parallel()
 	}
 
+	testIndexBetween(t, false)
+}
+
+func TestIndexBetweenCompressed(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	testIndexBetween(t, true)
+}
+
+func testIndexBetween(t *testing.T, compression bool) {
 	people := map[string]Person{
 		"jason": {
 			Name: "Jason",
@@ -434,7 +446,7 @@ func TestIndexBetween(t *testing.T) {
 
 	defer db.Close()
 
-	err = db.NewTable("index_testing")
+	err = db.NewTable("index_testing", compression)
 	panicNotNil(err)
 
 	err = db.Table("index_testing").NewIndex("Age")
@@ -605,6 +617,21 @@ func TestIndexBetween(t *testing.T) {
 	_, _, err = r.Next(&person)
 	if err != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
+
+	var allPeople []Person
+	panicNotNil(db.Table("index_testing").All().All(&allPeople))
+	if !allPeople[0].IsSame(people["ben"]) ||
+		!allPeople[1].IsSame(people["drew"]) ||
+		!allPeople[2].IsSame(people["jason"]) {
+		t.Fatal("All should have ben, drew and jason in order, but doesn't")
+	}
+
+	panicNotNil(db.Table("index_testing").Index("Age").All(true).All(&allPeople))
+	if !allPeople[0].IsSame(people["jason"]) ||
+		!allPeople[1].IsSame(people["drew"]) ||
+		!allPeople[2].IsSame(people["ben"]) {
+		t.Fatal("All should have jason, ben and drew in order, but doesn't")
 	}
 }
 

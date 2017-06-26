@@ -4,9 +4,116 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestDo(t *testing.T) {
+	if testing.Short() {
+		t.Parallel()
+	}
+
+	people := map[string]Person{
+		"jason": {
+			Name:   "Jason",
+			City:   "Sydney",
+			Age:    17,
+			Height: 1.76,
+			DOB:    time.Date(1999, 1, 28, 01, 01, 01, 01, time.UTC),
+		},
+		"ben": {
+			Name:   "Ben",
+			City:   "Melbourne",
+			Age:    19,
+			Height: 1.83,
+			DOB:    time.Date(1998, 5, 23, 01, 01, 01, 01, time.UTC),
+		},
+		"drew": {
+			Name:   "Drew",
+			City:   "London",
+			Age:    18,
+			Height: 1.72,
+			DOB:    time.Date(2001, 7, 13, 01, 01, 01, 01, time.UTC),
+		},
+	}
+
+	dir, err := ioutil.TempDir("", "cete_")
+	panicNotNil(err)
+
+	t.Log("testing directory:", dir)
+	defer func() {
+		if !t.Failed() {
+			os.RemoveAll(dir)
+		}
+	}()
+
+	db, err := Open(dir + "/data")
+	panicNotNil(err)
+
+	defer func() {
+		db.Close()
+	}()
+
+	panicNotNil(db.NewTable("do_testing"))
+
+	for name, person := range people {
+		panicNotNil(db.Table("do_testing").Set(name, person))
+	}
+
+	var sum int32
+	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+		atomic.AddInt32(&sum, 1)
+		return nil
+	}))
+
+	if sum != 3 {
+		t.Fatal("sum should be 3, but isn't")
+	}
+
+	sum = 0
+
+	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+		sum++
+		return nil
+	}, 1))
+
+	if sum != 3 {
+		t.Fatal("sum should be 3, but isn't")
+	}
+
+	sum = 0
+	testError := errors.New("cete testing: test do")
+
+	err = db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+		if key == "ben" {
+			time.Sleep(time.Millisecond * 100)
+			return testError
+		}
+
+		atomic.AddInt32(&sum, 1)
+		return nil
+	}, 5)
+	if err != testError {
+		t.Fatal("error should be testError, but isn't")
+	}
+
+	if sum != 2 {
+		t.Fatal("sum should be 2, but isn't")
+	}
+
+	r := newRange(func() (string, []byte, int, error) {
+		return "", nil, 0, testError
+	}, func() {}, nil)
+
+	err = r.Do(func(key string, counter int, doc Document) error {
+		t.Fatal("do should not run, but does")
+		return nil
+	})
+	if err != testError {
+		t.Fatal("error should be testError, but isn't")
+	}
+}
 
 func TestFilter(t *testing.T) {
 	if testing.Short() {
@@ -119,25 +226,24 @@ func TestFilter(t *testing.T) {
 
 	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
 		return doc.QueryFloat64("Height") > 1.75, nil
-	})
+	}).Skip(2)
 
-	err = r.Skip(2)
-	panicNotNil(err)
+	_, _, err = r.Next(nil)
+	if err != ErrEndOfRange {
+		t.Fatal("error should be ErrEndOfRange, but isn't")
+	}
 
 	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
 		return doc.QueryFloat64("Height") > 1.75, nil
-	})
-
-	err = r.Skip(1)
-	panicNotNil(err)
+	}).Skip(1)
 
 	expectPerson("jason", r, people["jason"])
 
 	r = db.Table("filter_testing").All().Filter(func(doc Document) (bool, error) {
 		return doc.QueryFloat64("Height") > 1.75, nil
-	})
+	}).Skip(3)
 
-	err = r.Skip(3)
+	_, _, err = r.Next(nil)
 	if err != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}

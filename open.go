@@ -5,8 +5,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger/badger"
-	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type indexConfig struct {
@@ -14,8 +14,11 @@ type indexConfig struct {
 }
 
 type tableConfig struct {
-	TableName string
-	Indexes   []indexConfig
+	TableName         string
+	Indexes           []indexConfig
+	UseKeyCompression bool
+	KeyCompression    map[string]string
+	NextKey           string
 }
 
 type dbConfig struct {
@@ -100,6 +103,21 @@ func Open(path string) (*DB, error) {
 				table.TableName + ": " + err.Error())
 		}
 		tb.db = db
+
+		if table.UseKeyCompression {
+			if table.KeyCompression != nil {
+				tb.keyToCompressed = table.KeyCompression
+			} else {
+				tb.keyToCompressed = make(map[string]string)
+			}
+
+			tb.compressedToKey = make(map[string]string)
+			tb.nextKey = table.NextKey
+			tb.compressionLock = new(sync.RWMutex)
+			for k, v := range table.KeyCompression {
+				tb.compressedToKey[v] = k
+			}
+		}
 
 		db.tables[Name(table.TableName)] = tb
 	}

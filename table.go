@@ -650,9 +650,9 @@ func incrementKey(key string) string {
 		if letter < '~' {
 			byteKey[i] = letter + 1
 			return string(byteKey)
-		} else {
-			byteKey[i] = '0'
 		}
+
+		byteKey[i] = '0'
 	}
 
 	byteKey = append(byteKey, '0')

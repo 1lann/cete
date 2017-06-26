@@ -83,7 +83,6 @@ Examples can be found on the [wiki](https://github.com/1lann/cete/wiki).
 
 ## Todo
 
-- [ ] Transparent key compression
 - [ ] Concurrent indexing to speed up index creation
 - [ ] Write more examples
 

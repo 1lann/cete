@@ -356,16 +356,19 @@ func (i *Index) addToIndex(indexKey []byte, key string) error {
 			log.Fatal("cete: marshal should never fail: ", err)
 		}
 
-		if item.Value() != nil {
+		if item.Value() == nil {
 			err = i.index.CompareAndSet(indexKey, data, item.Counter())
 			if err == badger.CasMismatch {
 				continue
 			}
-
-			return err
 		}
 
-		return i.index.Set(indexKey, data)
+		err = i.index.CompareAndSet(indexKey, data, item.Counter())
+		if err == badger.CasMismatch {
+			continue
+		}
+
+		return err
 	}
 }
 

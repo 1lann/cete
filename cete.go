@@ -59,6 +59,7 @@ type DB struct {
 	tables      map[Name]*Table
 	config      dbConfig
 	configMutex *sync.Mutex
+	openOptions badger.Options
 }
 
 func exists(path string) (bool, error) {

@@ -40,7 +40,7 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 		}
 	}
 
-	opts := badger.DefaultOptions
+	opts := d.openOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
 	return badger.NewKV(&opts)
@@ -48,7 +48,7 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 
 // Open opens the database at the provided path. It will create a new
 // database if the folder does not exist.
-func Open(path string) (*DB, error) {
+func Open(path string, opts ...badger.Options) (*DB, error) {
 	db := &DB{
 		path:        path,
 		tables:      make(map[Name]*Table),
@@ -77,6 +77,11 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, errors.New("cete: failed to read database configuration: " +
 			err.Error())
+	}
+
+	db.openOptions = badger.DefaultOptions
+	if len(opts) > 0 {
+		db.openOptions = opts[0]
 	}
 
 	db.config = config

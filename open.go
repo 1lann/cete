@@ -53,6 +53,11 @@ func Open(path string, opts ...badger.Options) (*DB, error) {
 		path:        path,
 		tables:      make(map[Name]*Table),
 		configMutex: new(sync.Mutex),
+		openOptions: badger.DefaultOptions,
+	}
+
+	if len(opts) > 0 {
+		db.openOptions = opts[0]
 	}
 
 	if ex, _ := exists(path); !ex {
@@ -77,11 +82,6 @@ func Open(path string, opts ...badger.Options) (*DB, error) {
 	if err != nil {
 		return nil, errors.New("cete: failed to read database configuration: " +
 			err.Error())
-	}
-
-	db.openOptions = badger.DefaultOptions
-	if len(opts) > 0 {
-		db.openOptions = opts[0]
 	}
 
 	db.config = config

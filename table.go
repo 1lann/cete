@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger/badger"
+	"github.com/dgraph-io/badger"
 )
 
 // NewTable creates a new table in the database. You can optionally specify

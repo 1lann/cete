@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger/badger"
+	"github.com/dgraph-io/badger"
 )
 
 // Bounds is the type for variables which represent a bound for Between.

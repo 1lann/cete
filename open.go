@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger/badger"
+	"github.com/dgraph-io/badger"
 )
 
 type indexConfig struct {

@@ -57,7 +57,7 @@ func main() {
 - Indexes.
 - Compound indexes.
 - Multi-indexes (tags).
-- Transparent key compression.
+- Transparent field name compression (i.e. document field names are mapped to smaller bytes when written to disk).
 - All range queries are sorted (ascending by default).
 - Uses a [custom version](https://github.com/1lann/msgpack) of [MessagePack](https://github.com/vmihailenco/msgpack) as underlying storage structure.
 - Efficient, concurrent range retrievers, filters, and index generation.

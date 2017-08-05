@@ -110,7 +110,7 @@ func (t *Table) Drop() error {
 
 // Get retrieves a value from a table with its primary key. dst must either be
 // a pointer or nil if you only want to get the counter or check for existence.
-func (t *Table) Get(key string, dst interface{}) (int, error) {
+func (t *Table) Get(key string, dst interface{}) (uint64, error) {
 	var item badger.KVItem
 	err := t.data.Get([]byte(key), &item)
 	if err != nil {
@@ -122,19 +122,20 @@ func (t *Table) Get(key string, dst interface{}) (int, error) {
 	}
 
 	if dst == nil {
-		return int(item.Counter()), nil
+		return item.Counter(), nil
 	}
 
 	if t.keyToCompressed != nil {
-		return int(item.Counter()), msgpack.UnmarshalCompressed(t.cToKey, item.Value(), dst)
+		return item.Counter(), msgpack.UnmarshalCompressed(t.cToKey, item.Value(), dst)
 	}
 
-	return int(item.Counter()), msgpack.Unmarshal(item.Value(), dst)
+	return item.Counter(), msgpack.Unmarshal(item.Value(), dst)
 }
 
 // Set sets a value in the table. An optional counter value can be provided
-// to only set the value if the counter value is the same.
-func (t *Table) Set(key string, value interface{}, counter ...int) error {
+// to only set the value if the counter value is the same. A counter value
+// of 0 is valid and represents a key that doesn't exist.
+func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 	var item badger.KVItem
 	err := t.data.Get([]byte(key), &item)
 	if err != nil {
@@ -142,7 +143,7 @@ func (t *Table) Set(key string, value interface{}, counter ...int) error {
 	}
 
 	if len(counter) > 0 {
-		if item.Counter() != uint16(counter[0]) {
+		if item.Counter() != counter[0] {
 			return ErrCounterChanged
 		}
 	}
@@ -158,12 +159,16 @@ func (t *Table) Set(key string, value interface{}, counter ...int) error {
 	}
 
 	if len(counter) > 0 {
-		err = t.data.CompareAndSet([]byte(key), data, uint16(counter[0]))
+		if counter[0] == 0 {
+			err = t.data.SetIfAbsent([]byte(key), data, 0)
+		} else {
+			err = t.data.CompareAndSet([]byte(key), data, counter[0])
+		}
 	} else {
-		err = t.data.Set([]byte(key), data)
+		err = t.data.Set([]byte(key), data, 0)
 	}
 
-	if err == badger.CasMismatch {
+	if err == badger.CasMismatch || err == badger.KeyExists {
 		return ErrCounterChanged
 	}
 
@@ -357,15 +362,15 @@ func (i *Index) addToIndex(indexKey []byte, key string) error {
 		}
 
 		if item.Value() == nil {
+			err = i.index.SetIfAbsent(indexKey, data, 0)
+			if err == badger.KeyExists {
+				continue
+			}
+		} else {
 			err = i.index.CompareAndSet(indexKey, data, item.Counter())
 			if err == badger.CasMismatch {
 				continue
 			}
-		}
-
-		err = i.index.CompareAndSet(indexKey, data, item.Counter())
-		if err == badger.CasMismatch {
-			continue
 		}
 
 		return err
@@ -384,7 +389,7 @@ func (i *Index) name() string {
 
 // Delete deletes the key from the table. An optional counter value can be
 // provided to only delete the document if the counter value is the same.
-func (t *Table) Delete(key string, counter ...int) error {
+func (t *Table) Delete(key string, counter ...uint64) error {
 	var item badger.KVItem
 	err := t.data.Get([]byte(key), &item)
 	if err != nil {
@@ -396,11 +401,11 @@ func (t *Table) Delete(key string, counter ...int) error {
 	}
 
 	if len(counter) > 0 {
-		if int(item.Counter()) != counter[0] {
+		if item.Counter() != counter[0] {
 			return ErrCounterChanged
 		}
 
-		err = t.data.CompareAndDelete([]byte(key), uint16(counter[0]))
+		err = t.data.CompareAndDelete([]byte(key), counter[0])
 	} else {
 		err = t.data.Delete([]byte(key))
 	}
@@ -430,6 +435,8 @@ func (t *Table) Index(index string) *Index {
 // values, the new value to set the document to, and an error which determines
 // whether or not the update should be aborted, and will be returned back from
 // Update.
+//
+// ErrNotFound will be returned if the document does not exist.
 //
 // The modifier function will be continuously called until the counter at the
 // beginning of handler matches the counter when the document is updated.
@@ -466,7 +473,7 @@ func (t *Table) Update(key string, handler interface{}) error {
 			return result[1].Interface().(error)
 		}
 
-		err = t.Set(key, result[0].Interface(), counter)
+		err = t.Set(key, result[0].Interface(), counter, 0)
 		if err == ErrCounterChanged {
 			continue
 		}
@@ -498,7 +505,7 @@ func (t *Table) name() string {
 func (t *Table) Between(lower interface{}, upper interface{},
 	reverse ...bool) *Range {
 	if lower == MaxValue || upper == MinValue {
-		return newRange(func() (string, []byte, int, error) {
+		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
 		}, func() {}, nil)
 	}
@@ -516,7 +523,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 		log.Println("cete: warning: lower and upper bounds of " +
 			"table.Between must be a string or Bounds. An empty range has " +
 			"been returned instead")
-		return newRange(func() (string, []byte, int, error) {
+		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
 		}, func() {}, nil)
 	}
@@ -527,7 +534,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 		log.Println("cete: warning: lower and upper bounds of " +
 			"table.Between must be a string or Bounds. An empty range has " +
 			"been returned instead")
-		return newRange(func() (string, []byte, int, error) {
+		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
 		}, func() {}, nil)
 	}
@@ -550,10 +557,10 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	}
 
 	var key string
-	var counter int
+	var counter uint64
 	var value []byte
 
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(func() (string, []byte, uint64, error) {
 		for it.Valid() {
 			if !shouldReverse && upper != MaxValue &&
 				bytes.Compare(it.Item().Key(), upperBytes) > 0 {
@@ -564,7 +571,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 			}
 
 			key = string(it.Item().Key())
-			counter = int(it.Item().Counter())
+			counter = it.Item().Counter()
 			value = make([]byte, len(it.Item().Value()))
 			copy(value, it.Item().Value())
 			it.Next()

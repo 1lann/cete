@@ -86,32 +86,21 @@ func (t *Table) NewIndex(name string) error {
 }
 
 func (i *Index) indexValues(name string) error {
-	r := i.table.Between(MinValue, MaxValue)
-
-	var entry bufferEntry
-	var results []interface{}
-	var err error
-
-	for {
-		entry = <-r.buffer
-		if entry.err == ErrEndOfRange {
-			break
-		} else if entry.err != nil {
-			return entry.err
-		}
-
-		results, err = i.indexQuery(entry.data, name)
+	i.table.Between(MinValue, MaxValue).Do(func(key string, counter uint64, doc Document) error {
+		results, err := i.indexQuery(doc.data, name)
 		if err != nil {
-			continue
+			return nil
 		}
 
 		for _, result := range results {
-			err = i.addToIndex(valueToBytes(result), entry.key)
+			err = i.addToIndex(valueToBytes(result), key)
 			if err != nil {
 				log.Println("cete: index error for index \""+name+"\":", err)
 			}
 		}
-	}
+
+		return nil
+	}, 20)
 
 	return nil
 }
@@ -158,7 +147,7 @@ func (i *Index) indexQuery(data []byte, query string) ([]interface{}, error) {
 // must either be a pointer or nil if you would like to only get the key/counter
 // and check for existence. Note that indexes are non-unique, a single index key
 // can map to multiple values. Use GetAll to get all such matching values.
-func (i *Index) One(key interface{}, dst interface{}) (string, int, error) {
+func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
 	r, err := i.GetAll(key)
 	if err != nil {
 		return "", 0, err
@@ -207,7 +196,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 	var value []byte
 	var item badger.KVItem
 
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(func() (string, []byte, uint64, error) {
 		for {
 			if c >= len(keys) {
 				return "", nil, 0, ErrEndOfRange
@@ -227,7 +216,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 			copy(value, item.Value())
 
 			c++
-			return keys[c-1], value, int(item.Counter()), nil
+			return keys[c-1], value, item.Counter(), nil
 		}
 	}, func() {}, i.table), nil
 }
@@ -243,7 +232,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 // bound values.
 func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 	if lower == MaxValue || upper == MinValue {
-		return newRange(func() (string, []byte, int, error) {
+		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
 		}, func() {}, nil)
 	}
@@ -342,13 +331,13 @@ func decodeArrayCount(header []byte) int64 {
 
 func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 	shouldReverse bool, lower,
-	upper interface{}) func() (string, []byte, int, error) {
+	upper interface{}) func() (string, []byte, uint64, error) {
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)
 
 	var entry bufferEntry
 
-	return func() (string, []byte, int, error) {
+	return func() (string, []byte, uint64, error) {
 		if lastRange != nil {
 			entry = <-lastRange.buffer
 			if entry.err != ErrEndOfRange {

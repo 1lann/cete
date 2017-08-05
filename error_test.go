@@ -156,6 +156,8 @@ func TestBadFiles(t *testing.T) {
 	panicNotNil(os.Rename(dir+"/data/6572726f725f74657374696e67/old",
 		dir+"/data/6572726f725f74657374696e67/data"))
 
+	panicNotNil(os.RemoveAll(dir + "/data"))
+
 	db, err = Open(dir + "/data")
 	panicNotNil(err)
 

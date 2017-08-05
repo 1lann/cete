@@ -14,7 +14,7 @@ const bufferSize = 100
 type bufferEntry struct {
 	key     string
 	data    []byte
-	counter int
+	counter uint64
 	err     error
 }
 
@@ -22,7 +22,7 @@ type bufferEntry struct {
 // by index/key.
 type Range struct {
 	buffer chan bufferEntry
-	next   func() (string, []byte, int, error)
+	next   func() (string, []byte, uint64, error)
 	close  func()
 	closed int32
 
@@ -32,7 +32,7 @@ type Range struct {
 // Next stores the next item in the range into dst. dst must be a pointer
 // to a value, or nil. If dst is nil then the value will be discarded, but
 // the counter and key will still be returned.
-func (r *Range) Next(dst interface{}) (string, int, error) {
+func (r *Range) Next(dst interface{}) (string, uint64, error) {
 	entry, more := <-r.buffer
 	if !more {
 		return "", 0, ErrEndOfRange
@@ -121,7 +121,7 @@ func (r *Range) All(dst interface{}) error {
 // Limit limits the number of documents that can be read from the range.
 // When this limit is reached, ErrEndOfRange will be returned.
 func (r *Range) Limit(n int64) *Range {
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(func() (string, []byte, uint64, error) {
 		entry := <-r.buffer
 
 		if n <= 0 {
@@ -141,7 +141,7 @@ func (r *Range) Close() {
 	}
 }
 
-func newRange(next func() (string, []byte, int, error), closer func(),
+func newRange(next func() (string, []byte, uint64, error), closer func(),
 	table *Table) *Range {
 	r := &Range{
 		buffer: make(chan bufferEntry, bufferSize),
@@ -214,7 +214,7 @@ func (r *Range) Filter(filter func(doc Document) (bool, error),
 	readFromWorker := 0
 	var entry *bufferEntry
 
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(func() (string, []byte, uint64, error) {
 		for {
 			entry = <-outboxes[readFromWorker]
 			readFromWorker = (readFromWorker + 1) % numWorkers
@@ -276,7 +276,7 @@ func filterWorker(filter func(doc Document) (bool, error),
 //
 // You can optionally specify the number of workers to concurrently operate
 // on. By default the number of workers is 10.
-func (r *Range) Do(operation func(key string, counter int, doc Document) error,
+func (r *Range) Do(operation func(key string, counter uint64, doc Document) error,
 	workers ...int) error {
 
 	numWorkers := 10
@@ -336,7 +336,7 @@ func (r *Range) Do(operation func(key string, counter int, doc Document) error,
 	return result
 }
 
-func doWorker(wg *sync.WaitGroup, operation func(key string, counter int,
+func doWorker(wg *sync.WaitGroup, operation func(key string, counter uint64,
 	doc Document) error, table *Table, inbox chan *bufferEntry,
 	completion chan error) {
 	var entry *bufferEntry
@@ -379,7 +379,7 @@ func (r *Range) Skip(n int) *Range {
 	for i := 0; i < n; i++ {
 		entry = <-r.buffer
 		if entry.err != nil {
-			return newRange(func() (string, []byte, int, error) {
+			return newRange(func() (string, []byte, uint64, error) {
 				return "", nil, 0, entry.err
 			}, func() {}, nil)
 		}
@@ -417,7 +417,7 @@ func (r *Range) Unique() *Range {
 	var entry bufferEntry
 	seen := make(map[string]bool)
 
-	return newRange(func() (string, []byte, int, error) {
+	return newRange(func() (string, []byte, uint64, error) {
 		for {
 			entry = <-r.buffer
 

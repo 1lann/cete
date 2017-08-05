@@ -62,7 +62,7 @@ func TestDo(t *testing.T) {
 	}
 
 	var sum int32
-	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter uint64, doc Document) error {
 		atomic.AddInt32(&sum, 1)
 		return nil
 	}))
@@ -73,7 +73,7 @@ func TestDo(t *testing.T) {
 
 	sum = 0
 
-	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+	panicNotNil(db.Table("do_testing").All().Do(func(key string, counter uint64, doc Document) error {
 		sum++
 		return nil
 	}, 1))
@@ -85,7 +85,7 @@ func TestDo(t *testing.T) {
 	sum = 0
 	testError := errors.New("cete testing: test do")
 
-	err = db.Table("do_testing").All().Do(func(key string, counter int, doc Document) error {
+	err = db.Table("do_testing").All().Do(func(key string, counter uint64, doc Document) error {
 		if key == "ben" {
 			time.Sleep(time.Millisecond * 100)
 			return testError
@@ -102,11 +102,11 @@ func TestDo(t *testing.T) {
 		t.Fatal("sum should be 2, but isn't")
 	}
 
-	r := newRange(func() (string, []byte, int, error) {
+	r := newRange(func() (string, []byte, uint64, error) {
 		return "", nil, 0, testError
 	}, func() {}, nil)
 
-	err = r.Do(func(key string, counter int, doc Document) error {
+	err = r.Do(func(key string, counter uint64, doc Document) error {
 		t.Fatal("do should not run, but does")
 		return nil
 	})

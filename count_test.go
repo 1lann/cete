@@ -141,7 +141,7 @@ func testCounting(t *testing.T, compression bool) {
 
 	countError := errors.New("cete testing: count error")
 
-	r := newRange(func() (string, []byte, int, error) {
+	r := newRange(func() (string, []byte, uint64, error) {
 		return "", nil, 0, countError
 	}, func() {}, nil)
 

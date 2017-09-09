@@ -26,32 +26,65 @@ type Range struct {
 	close  func()
 	closed int32
 
+	lastEntry bufferEntry
+
 	table *Table
 }
 
-// Next stores the next item in the range into dst. dst must be a pointer
-// to a value, or nil. If dst is nil then the value will be discarded, but
-// the counter and key will still be returned.
-func (r *Range) Next(dst interface{}) (string, uint64, error) {
+// Next retrieves the next item in the range, and returns true if the
+// next item is successfully retrieved.
+func (r *Range) Next() bool {
+	if r.lastEntry.err != nil {
+		return false
+	}
+
 	entry, more := <-r.buffer
 	if !more {
-		return "", 0, ErrEndOfRange
+		r.lastEntry.err = ErrEndOfRange
+		return false
 	}
+
+	r.lastEntry = entry
 
 	if entry.err != nil {
-		return entry.key, entry.counter, entry.err
+		return false
 	}
 
-	if dst != nil {
-		if r.table != nil && r.table.keyToCompressed != nil {
-			return entry.key, entry.counter,
-				msgpack.UnmarshalCompressed(r.table.cToKey, entry.data, dst)
-		}
+	return true
+}
 
-		return entry.key, entry.counter, msgpack.Unmarshal(entry.data, dst)
+// Document returns the current item's Document representation.
+func (r *Range) Document() Document {
+	return Document{
+		data:  r.lastEntry.data,
+		table: r.table,
+	}
+}
+
+// Decode decodes the current item into a pointer.
+func (r *Range) Decode(dst interface{}) error {
+	if r.table != nil && r.table.keyToCompressed != nil {
+		return msgpack.UnmarshalCompressed(r.table.cToKey, r.lastEntry.data,
+			dst)
 	}
 
-	return entry.key, entry.counter, nil
+	return msgpack.Unmarshal(r.lastEntry.data, dst)
+}
+
+// Counter returns the counter of the current item.
+func (r *Range) Counter() uint64 {
+	return r.lastEntry.counter
+}
+
+// Key returns the key of the current item.
+func (r *Range) Key() string {
+	return r.lastEntry.key
+}
+
+// Error returns the last error causing Next to return false. It will be nil
+// if Next returned true.
+func (r *Range) Error() error {
+	return r.lastEntry.err
 }
 
 // All stores all of the results into slice dst provided by as a pointer.

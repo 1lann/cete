@@ -10,10 +10,13 @@ import (
 
 func expectPerson(key string, r *Range, person Person) {
 	var nextPerson Person
-	nextKey, _, err := r.Next(&nextPerson)
+	if !r.Next() {
+		panic("Next should be successful")
+	}
+	err := r.Decode(&nextPerson)
 	panicNotNil(err)
 
-	if nextKey != key {
+	if r.Key() != key {
 		panic("key should be " + key + ", but isn't")
 	}
 
@@ -68,13 +71,10 @@ func TestTableBetween(t *testing.T) {
 
 	r := db.Table("table_testing").All().Limit(2)
 
-	var person Person
-
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -82,8 +82,7 @@ func TestTableBetween(t *testing.T) {
 
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -93,8 +92,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -104,8 +102,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -115,8 +112,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -126,8 +122,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -141,8 +136,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -154,8 +148,7 @@ func TestTableBetween(t *testing.T) {
 
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -165,8 +158,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between("drgw", "drfw", true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -176,8 +168,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between("jason", "draw")
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -190,8 +181,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -203,8 +193,7 @@ func TestTableBetween(t *testing.T) {
 
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -217,8 +206,7 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -228,8 +216,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between("ivan", "a", true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -242,15 +229,13 @@ func TestTableBetween(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
 	r = db.Table("table_testing").Between(MinValue, MinValue)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -260,8 +245,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between(MaxValue, MaxValue)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -271,8 +255,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between("zzzzzzz", MaxValue)
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -282,8 +265,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between(0, MaxValue)
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -293,8 +275,7 @@ func TestTableBetween(t *testing.T) {
 
 	r = db.Table("table_testing").Between(MinValue, 0)
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 

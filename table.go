@@ -117,7 +117,8 @@ func (t *Table) Get(key string, dst interface{}) (uint64, error) {
 		return 0, err
 	}
 
-	if item.Value() == nil {
+	itemValue := getItemValue(&item)
+	if itemValue == nil {
 		return 0, ErrNotFound
 	}
 
@@ -126,10 +127,11 @@ func (t *Table) Get(key string, dst interface{}) (uint64, error) {
 	}
 
 	if t.keyToCompressed != nil {
-		return item.Counter(), msgpack.UnmarshalCompressed(t.cToKey, item.Value(), dst)
+		return item.Counter(), msgpack.UnmarshalCompressed(t.cToKey,
+			itemValue, dst)
 	}
 
-	return item.Counter(), msgpack.Unmarshal(item.Value(), dst)
+	return item.Counter(), msgpack.Unmarshal(itemValue, dst)
 }
 
 // Set sets a value in the table. An optional counter value can be provided
@@ -168,7 +170,7 @@ func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 		err = t.data.Set([]byte(key), data, 0)
 	}
 
-	if err == badger.CasMismatch || err == badger.KeyExists {
+	if err == badger.ErrCasMismatch || err == badger.ErrKeyExists {
 		return ErrCounterChanged
 	}
 
@@ -176,7 +178,7 @@ func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 		return err
 	}
 
-	t.updateIndex(key, item.Value(), data)
+	t.updateIndex(key, getItemValue(&item), data)
 
 	return nil
 }
@@ -278,13 +280,14 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 			return err
 		}
 
-		if item.Value() == nil {
+		itemValue := getItemValue(&item)
+		if itemValue == nil {
 			log.Println("cete: warning: corrupt index detected:", i.name())
 			return nil
 		}
 
 		var list []string
-		err = msgpack.Unmarshal(item.Value(), &list)
+		err = msgpack.Unmarshal(itemValue, &list)
 		if err != nil {
 			log.Println("cete: warning: corrupt index detected:", i.name())
 			return err
@@ -307,7 +310,7 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 
 		if len(list) == 0 {
 			err = i.index.CompareAndDelete(indexKey, item.Counter())
-			if err == badger.CasMismatch {
+			if err == badger.ErrCasMismatch {
 				continue
 			}
 
@@ -320,7 +323,7 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 		}
 
 		err = i.index.CompareAndSet(indexKey, data, item.Counter())
-		if err == badger.CasMismatch {
+		if err == badger.ErrCasMismatch {
 			continue
 		}
 
@@ -339,8 +342,9 @@ func (i *Index) addToIndex(indexKey []byte, key string) error {
 
 		var list []string
 
-		if item.Value() != nil {
-			err = msgpack.Unmarshal(item.Value(), &list)
+		itemValue := getItemValue(&item)
+		if itemValue != nil {
+			err = msgpack.Unmarshal(itemValue, &list)
 			if err != nil {
 				log.Println("cete: warning: corrupt index detected:", i.name())
 				return err
@@ -361,14 +365,14 @@ func (i *Index) addToIndex(indexKey []byte, key string) error {
 			log.Fatal("cete: marshal should never fail: ", err)
 		}
 
-		if item.Value() == nil {
+		if itemValue == nil {
 			err = i.index.SetIfAbsent(indexKey, data, 0)
-			if err == badger.KeyExists {
+			if err == badger.ErrKeyExists {
 				continue
 			}
 		} else {
 			err = i.index.CompareAndSet(indexKey, data, item.Counter())
-			if err == badger.CasMismatch {
+			if err == badger.ErrCasMismatch {
 				continue
 			}
 		}
@@ -396,7 +400,8 @@ func (t *Table) Delete(key string, counter ...uint64) error {
 		return err
 	}
 
-	if item.Value() == nil {
+	itemValue := getItemValue(&item)
+	if itemValue == nil {
 		return nil
 	}
 
@@ -410,7 +415,7 @@ func (t *Table) Delete(key string, counter ...uint64) error {
 		err = t.data.Delete([]byte(key))
 	}
 
-	if err == badger.CasMismatch {
+	if err == badger.ErrCasMismatch {
 		return ErrCounterChanged
 	}
 
@@ -418,7 +423,7 @@ func (t *Table) Delete(key string, counter ...uint64) error {
 		return err
 	}
 
-	t.updateIndex(key, item.Value(), nil)
+	t.updateIndex(key, itemValue, nil)
 
 	return nil
 }
@@ -513,24 +518,16 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
 	itOpts := badger.DefaultIteratorOptions
-	itOpts.PrefetchSize = 5
+	itOpts.PrefetchSize = prefetchSize
 	itOpts.Reverse = shouldReverse
 	it := t.data.NewIterator(itOpts)
 
-	upperString, isString := upper.(string)
-	_, isBounds := upper.(Bounds)
-	if !isString && !isBounds {
-		log.Println("cete: warning: lower and upper bounds of " +
-			"table.Between must be a string or Bounds. An empty range has " +
-			"been returned instead")
-		return newRange(func() (string, []byte, uint64, error) {
-			return "", nil, 0, ErrEndOfRange
-		}, func() {}, nil)
-	}
-
-	lowerString, isString := lower.(string)
-	_, isBounds = lower.(Bounds)
-	if !isString && !isBounds {
+	upperString, upperIsString := upper.(string)
+	_, upperIsBounds := upper.(Bounds)
+	lowerString, lowerIsString := lower.(string)
+	_, lowerIsBounds := lower.(Bounds)
+	if (!upperIsString && !upperIsBounds) ||
+		(!lowerIsString && !lowerIsBounds) {
 		log.Println("cete: warning: lower and upper bounds of " +
 			"table.Between must be a string or Bounds. An empty range has " +
 			"been returned instead")
@@ -572,8 +569,9 @@ func (t *Table) Between(lower interface{}, upper interface{},
 
 			key = string(it.Item().Key())
 			counter = it.Item().Counter()
-			value = make([]byte, len(it.Item().Value()))
-			copy(value, it.Item().Value())
+			itemValue := getItemValue(it.Item())
+			value = make([]byte, len(itemValue))
+			copy(value, itemValue)
 			it.Next()
 			return key, value, counter, nil
 		}
@@ -591,8 +589,7 @@ func (t *Table) CountBetween(lower, upper interface{}) int64 {
 	}
 
 	itOpts := badger.DefaultIteratorOptions
-	itOpts.PrefetchSize = 5
-	itOpts.FetchValues = false
+	itOpts.PrefetchSize = prefetchSize
 	it := t.data.NewIterator(itOpts)
 
 	upperString, isString := upper.(string)

@@ -12,7 +12,7 @@ func TestQuery(t *testing.T) {
 		t.Parallel()
 	}
 
-	now := time.Now()
+	now := time.Now().Round(0) // strip off monatonic time
 	jason := Person{
 		Name:   "Jason",
 		City:   "Sydney",

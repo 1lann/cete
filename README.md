@@ -52,6 +52,25 @@ func main() {
 }
 ```
 
+## Recent breaking changes
+I don't know if anyone uses Cete, but whatever.
+
+I've recently made some breaking changes to how `Range` works. It's now a more traditional cursor setup that allows for cleaner concise code, similar to `bufio.Scanner`. Here's an example how you use it:
+
+```go
+r := r.Table("people").All()
+for r.Next() {
+	var result Person
+	r.Decode(&result)
+	fmt.Println("person is:", result)
+	fmt.Println("key is:", r.Key())
+	fmt.Println("counter is:", r.Counter())
+	fmt.Println("name (document demo) is:", r.Document().QueryString("Name"))
+}
+
+fmt.Println("final error:", r.Error()) // will typically return ErrEndOfRange
+```
+
 ## Features
 
 - Indexes.
@@ -83,10 +102,10 @@ Examples can be found on the [wiki](https://github.com/1lann/cete/wiki).
 
 ## Todo
 
-- [ ] Concurrent indexing to speed up index creation
-- [ ] Write more examples
+- [ ] Review performance, specifically `Between` on a `Range`.
+- [ ] Write more examples.
 
-## Performance
+## Performance [OUT OF DATE]
 
 I've performed some benchmarks comparing Cete to two other pure Go database wrappers, [Storm](https://github.com/asdine/storm) and [BoltHold](https://github.com/timshannon/bolthold). The source code for this benchmark can be found [here](https://github.com/1lann/db-benchmark).
 

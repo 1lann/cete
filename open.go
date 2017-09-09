@@ -4,9 +4,11 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/options"
 )
 
 type indexConfig struct {
@@ -49,11 +51,16 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 // Open opens the database at the provided path. It will create a new
 // database if the folder does not exist.
 func Open(path string, opts ...badger.Options) (*DB, error) {
+	defaultOpts := badger.DefaultOptions
+	defaultOpts.TableLoadingMode = options.MemoryMap
+	defaultOpts.ValueGCThreshold = 0.2
+	defaultOpts.ValueGCRunInterval = time.Second * 10
+
 	db := &DB{
 		path:        path,
 		tables:      make(map[Name]*Table),
 		configMutex: new(sync.Mutex),
-		openOptions: badger.DefaultOptions,
+		openOptions: defaultOpts,
 	}
 
 	if len(opts) > 0 {

@@ -176,9 +176,7 @@ func TestFilter(t *testing.T) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	var person Person
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -193,8 +191,7 @@ func TestFilter(t *testing.T) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -204,8 +201,7 @@ func TestFilter(t *testing.T) {
 
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -219,8 +215,7 @@ func TestFilter(t *testing.T) {
 		t.Fatal("count should be 2, but isn't")
 	}
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -228,8 +223,7 @@ func TestFilter(t *testing.T) {
 		return doc.QueryFloat64("Height") > 1.75, nil
 	}).Skip(2)
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -243,8 +237,7 @@ func TestFilter(t *testing.T) {
 		return doc.QueryFloat64("Height") > 1.75, nil
 	}).Skip(3)
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -252,23 +245,27 @@ func TestFilter(t *testing.T) {
 		return doc.QueryFloat64("Height") > 0.5, nil
 	})
 
-	key, _, err := r.Next(nil)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
 
-	if key != "ben" {
+	if r.Key() != "ben" {
 		t.Fatal("key should be ben, but isn't")
 	}
-	key, _, err = r.Next(nil)
-	panicNotNil(err)
 
-	if key != "drew" {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+
+	if r.Key() != "drew" {
 		t.Fatal("key should be drew, but isn't")
 	}
 
-	key, _, err = r.Next(nil)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
 
-	if key != "jason" {
+	if r.Key() != "jason" {
 		t.Fatal("key should be jason, but isn't")
 	}
 
@@ -278,8 +275,7 @@ func TestFilter(t *testing.T) {
 		return false, filterError
 	})
 
-	_, _, err = r.Next(nil)
-	if err != filterError {
+	if r.Next() || r.Error() != filterError {
 		t.Fatal("error should be filter error, but isn't")
 	}
 }

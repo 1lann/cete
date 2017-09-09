@@ -93,8 +93,7 @@ func testCompoundIndex(t *testing.T, compression bool) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("matheus", r, people["matheus"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -105,8 +104,7 @@ func testCompoundIndex(t *testing.T, compression bool) {
 	expectPerson("matheus", r, people["matheus"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -119,8 +117,7 @@ func testCompoundIndex(t *testing.T, compression bool) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -130,8 +127,7 @@ func testCompoundIndex(t *testing.T, compression bool) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("matheus", r, people["matheus"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -139,8 +135,7 @@ func testCompoundIndex(t *testing.T, compression bool) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 }
@@ -190,35 +185,29 @@ func testMultiIndex(t *testing.T, compression bool) {
 	panicNotNil(db.Table("index_testing").Set("drew", people["drew"]))
 	panicNotNil(db.Table("index_testing").Set("jason", people["jason"]))
 
-	r, err := db.Table("index_testing").Index("Likes.*").GetAll("java")
-	panicNotNil(err)
+	r := db.Table("index_testing").Index("Likes.*").GetAll("java")
 
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r, err = db.Table("index_testing").Index("Likes.*").GetAll("go")
-	panicNotNil(err)
+	r = db.Table("index_testing").Index("Likes.*").GetAll("go")
 
 	expectPerson("ben", r, people["ben"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
-	r, err = db.Table("index_testing").Index("Likes.*").GetAll("js")
-	panicNotNil(err)
+	r = db.Table("index_testing").Index("Likes.*").GetAll("js")
 
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -235,8 +224,7 @@ func testMultiIndex(t *testing.T, compression bool) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -245,8 +233,7 @@ func testMultiIndex(t *testing.T, compression bool) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(nil)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 }

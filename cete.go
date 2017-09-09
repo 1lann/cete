@@ -129,6 +129,17 @@ func valueToBytes(value interface{}) (b []byte) {
 	panic(fmt.Sprintf("cete: unsupported value: %v", value))
 }
 
+func getItemValue(item *badger.KVItem) []byte {
+	result := make(chan []byte, 1)
+	err := item.Value(func(value []byte) {
+		result <- value
+	})
+	if err != nil {
+		return nil
+	}
+	return <-result
+}
+
 // Document represents the value of a document.
 type Document struct {
 	data  []byte

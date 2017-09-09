@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger"
@@ -19,6 +20,8 @@ var (
 	MaxValue Bounds = (1 << 63) - 1
 )
 
+const prefetchSize = 2
+
 // NewIndex creates a new index on the table, using the name as the Query.
 // The index name must not be empty, and must be no more than 125 bytes
 // long. ErrAlreadyExists will be returned if the index already exists.
@@ -26,7 +29,6 @@ var (
 // NewIndex may take a while if there are already values in the
 // table, as it needs to index all the existing values in the table.
 func (t *Table) NewIndex(name string) error {
-	// TODO: Implement concurrent indexing
 	if name == "" || len(name) > 125 {
 		return ErrBadIdentifier
 	}
@@ -86,7 +88,14 @@ func (t *Table) NewIndex(name string) error {
 }
 
 func (i *Index) indexValues(name string) error {
+	var total int64
+
 	i.table.Between(MinValue, MaxValue).Do(func(key string, counter uint64, doc Document) error {
+		last := atomic.AddInt64(&total, 1)
+		if last%100000 == 0 {
+			log.Println(last)
+		}
+
 		results, err := i.indexQuery(doc.data, name)
 		if err != nil {
 			return nil
@@ -148,35 +157,44 @@ func (i *Index) indexQuery(data []byte, query string) ([]interface{}, error) {
 // and check for existence. Note that indexes are non-unique, a single index key
 // can map to multiple values. Use GetAll to get all such matching values.
 func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
-	r, err := i.GetAll(key)
-	if err != nil {
-		return "", 0, err
-	}
-
+	r := i.GetAll(key)
 	defer r.Close()
 
-	tableKey, counter, err := r.Next(dst)
-	if err == ErrEndOfRange {
-		log.Println("cete: warning: corrupt index detected:", i.name())
-		return tableKey, counter, ErrNotFound
+	if !r.Next() {
+		if r.Error() == ErrEndOfRange {
+			return "", 0, ErrNotFound
+		}
+
+		return "", 0, r.Error()
 	}
 
-	return tableKey, counter, err
+	return r.Key(), r.Counter(), r.Decode(dst)
 }
 
 // GetAll returns all the matching values as a range for the provided index key.
-func (i *Index) GetAll(key interface{}) (*Range, error) {
+func (i *Index) GetAll(key interface{}) *Range {
 	var item badger.KVItem
 	err := i.index.Get(valueToBytes(key), &item)
 	if err != nil {
-		return nil, err
+		return newRange(func() (string, []byte, uint64, error) {
+			return "", nil, 0, err
+		}, func() {}, nil)
 	}
 
-	if item.Value() == nil {
-		return nil, ErrNotFound
+	itemValue := getItemValue(&item)
+	if itemValue == nil {
+		return newRange(func() (string, []byte, uint64, error) {
+			return "", nil, 0, ErrEndOfRange
+		}, func() {}, nil)
 	}
 
-	return i.getAllValues(item.Value())
+	r, err := i.getAllValues(itemValue)
+	if err != nil {
+		return newRange(func() (string, []byte, uint64, error) {
+			return "", nil, 0, err
+		}, func() {}, nil)
+	}
+	return r
 }
 
 func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
@@ -189,7 +207,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 
 	if len(keys) == 0 {
 		log.Println("cete: corrupt index \""+i.name()+"\":", err)
-		return nil, ErrNotFound
+		return nil, ErrIndexError
 	}
 
 	c := 0
@@ -207,13 +225,14 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 				return "", nil, 0, err
 			}
 
-			if item.Value() == nil {
+			itemValue := getItemValue(&item)
+			if itemValue == nil {
 				c++
 				continue
 			}
 
-			value = make([]byte, len(item.Value()))
-			copy(value, item.Value())
+			value = make([]byte, len(itemValue))
+			copy(value, itemValue)
 
 			c++
 			return keys[c-1], value, item.Counter(), nil
@@ -240,7 +259,7 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
 	itOpts := badger.DefaultIteratorOptions
-	itOpts.PrefetchSize = 5
+	itOpts.PrefetchSize = prefetchSize
 	itOpts.Reverse = shouldReverse
 	it := i.index.NewIterator(itOpts)
 
@@ -282,7 +301,7 @@ func (i *Index) CountBetween(lower, upper interface{}) int64 {
 	}
 
 	itOpts := badger.DefaultIteratorOptions
-	itOpts.PrefetchSize = 5
+	itOpts.PrefetchSize = prefetchSize
 	it := i.index.NewIterator(itOpts)
 
 	upperBytes := valueToBytes(upper)
@@ -302,11 +321,12 @@ func (i *Index) CountBetween(lower, upper interface{}) int64 {
 			return count
 		}
 
-		if len(it.Item().Value()) < 5 {
+		itemValue := getItemValue(it.Item())
+		if len(itemValue) < 5 {
 			// Malformed index value my cause a panic here
-			count += decodeArrayCount(it.Item().Value())
+			count += decodeArrayCount(itemValue)
 		} else {
-			count += decodeArrayCount(it.Item().Value()[:5])
+			count += decodeArrayCount(itemValue[:5])
 		}
 
 		it.Next()
@@ -356,7 +376,7 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 				return "", nil, 0, ErrEndOfRange
 			}
 
-			r, err := i.getAllValues(it.Item().Value())
+			r, err := i.getAllValues(getItemValue(it.Item()))
 			it.Next()
 			if err != nil {
 				continue

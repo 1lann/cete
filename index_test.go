@@ -93,16 +93,19 @@ func TestPostIndex(t *testing.T) {
 	var a Person
 	var b Person
 
-	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	panicNotNil(err)
+	r := db.Table("index_testing").Index("Age").GetAll(18)
 
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -123,13 +126,18 @@ func TestPostIndex(t *testing.T) {
 	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
+
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -212,16 +220,19 @@ func TestPreIndex(t *testing.T) {
 	var a Person
 	var b Person
 
-	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	panicNotNil(err)
+	r := db.Table("index_testing").Index("Age").GetAll(18)
 
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -242,13 +253,17 @@ func TestPreIndex(t *testing.T) {
 	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -346,16 +361,19 @@ func TestIndexDrop(t *testing.T) {
 	var a Person
 	var b Person
 
-	r, err := db.Table("index_testing").Index("Age").GetAll(18)
-	panicNotNil(err)
+	r := db.Table("index_testing").Index("Age").GetAll(18)
 
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -376,13 +394,17 @@ func TestIndexDrop(t *testing.T) {
 	}
 
 	r = db.Table("index_testing").Index("Age").Between(18, 18, false)
-	_, _, err = r.Next(&a)
-	panicNotNil(err)
-	_, _, err = r.Next(&b)
-	panicNotNil(err)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&a)
 
-	_, _, err = r.Next(&b)
-	if err != ErrEndOfRange {
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	r.Decode(&b)
+
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -459,14 +481,11 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r := db.Table("index_testing").Index("Age").Between(MinValue, MaxValue)
 
-	var person Person
-
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -480,8 +499,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -493,8 +511,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -504,8 +521,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(16, 14, true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -515,8 +531,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(20, 14)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -526,8 +541,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(MinValue, MinValue)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -537,8 +551,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(MaxValue, MaxValue)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -548,8 +561,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(100, MaxValue)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -562,8 +574,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -575,8 +586,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -589,8 +599,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -600,8 +609,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 
 	r = db.Table("index_testing").Index("Age").Between(17, 1, true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -614,8 +622,7 @@ func testIndexBetween(t *testing.T, compression bool) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -691,14 +698,11 @@ func TestIndexSet(t *testing.T) {
 
 	r := db.Table("index_testing").Index("Age").Between(MinValue, MaxValue)
 
-	var person Person
-
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 	expectPerson("jason", r, people["jason"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -712,8 +716,7 @@ func TestIndexSet(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -725,8 +728,7 @@ func TestIndexSet(t *testing.T) {
 
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -736,8 +738,7 @@ func TestIndexSet(t *testing.T) {
 
 	r = db.Table("index_testing").Index("Age").Between(16, 14, true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -747,8 +748,7 @@ func TestIndexSet(t *testing.T) {
 
 	r = db.Table("index_testing").Index("Age").Between(20, 14)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -761,8 +761,7 @@ func TestIndexSet(t *testing.T) {
 	expectPerson("jason", r, people["jason"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -774,8 +773,7 @@ func TestIndexSet(t *testing.T) {
 
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -788,8 +786,7 @@ func TestIndexSet(t *testing.T) {
 	expectPerson("ben", r, people["ben"])
 	expectPerson("drew", r, people["drew"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -799,8 +796,7 @@ func TestIndexSet(t *testing.T) {
 
 	r = db.Table("index_testing").Index("Age").Between(17, 1, true)
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 
@@ -813,8 +809,7 @@ func TestIndexSet(t *testing.T) {
 	expectPerson("drew", r, people["drew"])
 	expectPerson("ben", r, people["ben"])
 
-	_, _, err = r.Next(&person)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 }
@@ -1315,22 +1310,28 @@ func TestIndexAll(t *testing.T) {
 	}
 
 	var result pp
-	key, _, err := r.Next(&result)
+
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	err = r.Decode(&result)
 	panicNotNil(err)
 
-	if key != "b" || result.Name != "Alex" || result.NotName != "" {
+	if r.Key() != "b" || result.Name != "Alex" || result.NotName != "" {
 		t.Fatal("result should be Alex, but isn't")
 	}
 
-	key, _, err = r.Next(&result)
+	if !r.Next() {
+		t.Fatal("Next should be successful")
+	}
+	err = r.Decode(&result)
 	panicNotNil(err)
 
-	if key != "a" || result.Name != "Jason" || result.NotName != "" {
+	if r.Key() != "a" || result.Name != "Jason" || result.NotName != "" {
 		t.Fatal("result should be Jason, but isn't")
 	}
 
-	_, _, err = r.Next(&result)
-	if err != ErrEndOfRange {
+	if r.Next() || r.Error() != ErrEndOfRange {
 		t.Fatal("error should be ErrEndOfRange, but isn't")
 	}
 }

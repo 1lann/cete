@@ -2,8 +2,10 @@ package cete
 
 import (
 	"errors"
+	"log"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/1lann/msgpack"
@@ -45,7 +47,25 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 	opts := d.openOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
-	return badger.NewKV(&opts)
+
+	kv, err := badger.NewKV(&opts)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Println("cete: gc panic:", r)
+			}
+		}()
+
+		for atomic.LoadInt32(&d.closed) == 0 {
+			kv.RunValueLogGC(0.2)
+			time.Sleep(time.Second * 10)
+		}
+	}()
+	return kv, nil
 }
 
 // Open opens the database at the provided path. It will create a new
@@ -53,8 +73,6 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 func Open(path string, opts ...badger.Options) (*DB, error) {
 	defaultOpts := badger.DefaultOptions
 	defaultOpts.TableLoadingMode = options.MemoryMap
-	defaultOpts.ValueGCThreshold = 0.2
-	defaultOpts.ValueGCRunInterval = time.Second * 10
 
 	db := &DB{
 		path:        path,

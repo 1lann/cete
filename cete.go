@@ -60,6 +60,7 @@ type DB struct {
 	config      dbConfig
 	configMutex *sync.Mutex
 	openOptions badger.Options
+	closed      int32
 }
 
 func exists(path string) (bool, error) {
@@ -131,8 +132,9 @@ func valueToBytes(value interface{}) (b []byte) {
 
 func getItemValue(item *badger.KVItem) []byte {
 	result := make(chan []byte, 1)
-	err := item.Value(func(value []byte) {
+	err := item.Value(func(value []byte) error {
 		result <- value
+		return nil
 	})
 	if err != nil {
 		return nil

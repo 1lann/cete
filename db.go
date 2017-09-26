@@ -1,7 +1,11 @@
 package cete
 
+import "sync/atomic"
+
 // Close closes the database (all file handlers to the database).
 func (d *DB) Close() {
+	atomic.StoreInt32(&d.closed, 1)
+
 	for _, table := range d.tables {
 		for _, index := range table.indexes {
 			index.index.Close()

@@ -590,6 +590,7 @@ func (t *Table) CountBetween(lower, upper interface{}) int64 {
 
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
+	itOpts.PrefetchValues = false
 	it := t.data.NewIterator(itOpts)
 
 	upperString, isString := upper.(string)

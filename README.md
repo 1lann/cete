@@ -10,6 +10,8 @@
 >
 >A group of badgers.
 
+## Not currently compatible with latest version of Badger, will be updated in the future.
+
 Cete is an easy-to-use, lightweight, pure Go embedded database built on [Badger](https://github.com/dgraph-io/badger) for use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
 **Cete is currently in alpha, it is somewhat unstable and NOT recommended for use in production yet. Breaking library changes may be released.**

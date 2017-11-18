@@ -10,8 +10,6 @@
 >
 >A group of badgers.
 
-## Not currently compatible with latest version of Badger, will be updated in the future.
-
 Cete is an easy-to-use, lightweight, pure Go embedded database built on [Badger](https://github.com/dgraph-io/badger) for use in your Go programs. Unlike most other embedded database toolkits for Go, Cete is schemaless, yet still blazing fast. It's great for cases where you need a fast, on-disk, embedded database. Cete is licensed under the [MIT License](/LICENSE).
 
 **Cete is currently in alpha, it is somewhat unstable and NOT recommended for use in production yet. Breaking library changes may be released.**
@@ -124,7 +122,7 @@ Cete is typically twice as fast as Storm for concurrent operations, and BoltHold
 The index is skipped for that document! The document won't ever appear in the index. This also applies to compound indexes, if any of the queries for the compound index fails/results in nil, the document won't be indexed for that compound index.
 
 ### Are there transactions?
-No, this library is meant to be a very simple and basic abstraction layer of Badger, and Badger does not support transactions.
+No, Cete uses Badger v0.8.1, which does not support transactions. Cete itself is meant to be a very simple and basic abstraction layer of Badger.
 
 For single document updates (such as incrementing a value), you can use the `Update` method which constantly re-attempts the update until the counter matches, eradicating race conditions. Alternatively you can use the counter yourself and implement the logic to handle unmatched counters.
 

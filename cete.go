@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/1lann/badger"
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger"
 )
 
 // Common errors that can be returned

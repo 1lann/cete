@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/1lann/badger"
+	"github.com/1lann/badger/options"
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger"
-	"github.com/dgraph-io/badger/options"
 )
 
 type indexConfig struct {

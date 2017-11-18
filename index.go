@@ -28,6 +28,9 @@ const prefetchSize = 2
 //
 // NewIndex may take a while if there are already values in the
 // table, as it needs to index all the existing values in the table.
+//
+// NewIndex does not use table transactions, it will create its own
+// transaction that will make it safe even during concurrent writes.
 func (t *Table) NewIndex(name string) error {
 	if name == "" || len(name) > 125 {
 		return ErrBadIdentifier
@@ -90,7 +93,7 @@ func (t *Table) NewIndex(name string) error {
 func (i *Index) indexValues(name string) error {
 	var total int64
 
-	i.table.Between(MinValue, MaxValue).Do(func(key string, counter uint64, doc Document) error {
+	i.table.Between(MinValue, MaxValue).Do(func(key string, timestamp uint64, doc Document) error {
 		last := atomic.AddInt64(&total, 1)
 		if last%100000 == 0 {
 			log.Println(last)
@@ -153,7 +156,7 @@ func (i *Index) indexQuery(data []byte, query string) ([]interface{}, error) {
 }
 
 // One puts the first matching value with the index's key into dst. dst
-// must either be a pointer or nil if you would like to only get the key/counter
+// must either be a pointer or nil if you would like to only get the key/timestamp
 // and check for existence. Note that indexes are non-unique, a single index key
 // can map to multiple values. Use GetAll to get all such matching values.
 func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
@@ -168,36 +171,43 @@ func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
 		return "", 0, r.Error()
 	}
 
-	return r.Key(), r.Counter(), r.Decode(dst)
+	return r.Key(), r.Timestamp(), r.Decode(dst)
 }
 
 // GetAll returns all the matching values as a range for the provided index key.
 func (i *Index) GetAll(key interface{}) *Range {
-	var item badger.KVItem
-	err := i.index.Get(valueToBytes(key), &item)
+	item, err := indexTx.Get(valueToBytes(key))
 	if err != nil {
 		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, err
 		}, func() {}, nil)
 	}
 
-	itemValue := getItemValue(&item)
+	itemValue := getItemValue(item)
 	if itemValue == nil {
 		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
 		}, func() {}, nil)
 	}
 
-	r, err := i.getAllValues(itemValue)
+	var tableTx *Tx
+	if len(tx) > 0 {
+
+	}
+
+	tableTx := i.table.data.NewTransaction(false)
+	r, err := i.getAllValues(tableTx, itemValue)
 	if err != nil {
 		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, err
-		}, func() {}, nil)
+		}, func() {
+			tableTx.Discard()
+		}, nil)
 	}
 	return r
 }
 
-func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
+func (i *Index) getAllValues(tableTx *Txn, indexValue []byte) (*Range, error) {
 	var keys []string
 	err := msgpack.Unmarshal(indexValue, &keys)
 	if err != nil {
@@ -212,7 +222,6 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 
 	c := 0
 	var value []byte
-	var item badger.KVItem
 
 	return newRange(func() (string, []byte, uint64, error) {
 		for {
@@ -220,12 +229,12 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 				return "", nil, 0, ErrEndOfRange
 			}
 
-			err = i.table.data.Get([]byte(keys[c]), &item)
+			item, err := tableTx.Get([]byte(keys[c]))
 			if err != nil {
 				return "", nil, 0, err
 			}
 
-			itemValue := getItemValue(&item)
+			itemValue := getItemValue(item)
 			if itemValue == nil {
 				c++
 				continue
@@ -235,7 +244,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 			copy(value, itemValue)
 
 			c++
-			return keys[c-1], value, item.Counter(), nil
+			return keys[c-1], value, item.Version(), nil
 		}
 	}, func() {}, i.table), nil
 }
@@ -258,10 +267,13 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 
 	shouldReverse := (len(reverse) > 0) && reverse[0]
 
+	indexTx := i.index.NewTransaction(false)
+	tableTx := i.table.data.NewTransaction(false)
+
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
 	itOpts.Reverse = shouldReverse
-	it := i.index.NewIterator(itOpts)
+	it := indexTx.NewIterator(itOpts)
 
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)
@@ -282,12 +294,15 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 
 	var lastRange *Range
 
-	return newRange(i.betweenNext(it, lastRange, shouldReverse, lower, upper),
+	return newRange(i.betweenNext(tableTx,
+		it, lastRange, shouldReverse, lower, upper),
 		func() {
 			if lastRange != nil {
 				lastRange.Close()
 			}
 			it.Close()
+			indexTx.Discard()
+			tableTx.Discard()
 		}, i.table)
 }
 
@@ -300,9 +315,12 @@ func (i *Index) CountBetween(lower, upper interface{}) int64 {
 		return 0
 	}
 
+	indexTx := i.index.NewTransaction(false)
+	defer indexTx.Discard()
+
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
-	it := i.index.NewIterator(itOpts)
+	it := indexTx.NewIterator(itOpts)
 
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)
@@ -349,8 +367,8 @@ func decodeArrayCount(header []byte) int64 {
 	return 0
 }
 
-func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
-	shouldReverse bool, lower,
+func (i *Index) betweenNext(tableTx *Txn,
+	it *badger.Iterator, lastRange *Range, shouldReverse bool, lower,
 	upper interface{}) func() (string, []byte, uint64, error) {
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)
@@ -361,7 +379,7 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 		if lastRange != nil {
 			entry = <-lastRange.buffer
 			if entry.err != ErrEndOfRange {
-				return entry.key, entry.data, entry.counter, entry.err
+				return entry.key, entry.data, entry.timestamp, entry.err
 			}
 
 			lastRange.Close()
@@ -376,7 +394,7 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 				return "", nil, 0, ErrEndOfRange
 			}
 
-			r, err := i.getAllValues(getItemValue(it.Item()))
+			r, err := i.getAllValues(tableTx, getItemValue(it.Item()))
 			it.Next()
 			if err != nil {
 				continue
@@ -386,7 +404,7 @@ func (i *Index) betweenNext(it *badger.Iterator, lastRange *Range,
 
 			entry = <-lastRange.buffer
 			if entry.err != ErrEndOfRange {
-				return entry.key, entry.data, entry.counter, entry.err
+				return entry.key, entry.data, entry.timestamp, entry.err
 			}
 
 			lastRange.Close()

@@ -68,6 +68,15 @@ func (d *DB) NewTable(name string, keyCompression ...bool) error {
 	return nil
 }
 
+// BeginTx starts a new lockless transaction, with the first argument
+// specifying whether or not the transaction will write.
+func (t *Table) BeginTx(write bool, timestamp ...uint64) *Txn {
+	if len(timestamp) > 0 {
+		return t.data.NewTransactionAt(timestamp[0], write)
+	}
+	return t.data.NewTransaction(write)
+}
+
 // Drop drops the table from the database.
 func (t *Table) Drop() error {
 	t.db.configMutex.Lock()
@@ -109,36 +118,40 @@ func (t *Table) Drop() error {
 }
 
 // Get retrieves a value from a table with its primary key. dst must either be
-// a pointer or nil if you only want to get the counter or check for existence.
-func (t *Table) Get(key string, dst interface{}) (uint64, error) {
-	var item badger.KVItem
-	err := t.data.Get([]byte(key), &item)
+// a pointer or nil if you only want to get the timestamp or check for existence.
+func (t *Table) Get(key string, dst interface{}, tx ...*Txn) (uint64, error) {
+	var transaction *Txn
+	if len(tx) > 0 {
+		transaction = tx[0]
+	} else {
+		transaction = t.data.NewTransaction(false)
+		defer transaction.Discard()
+	}
+	item, err := transaction.Get([]byte(key))
 	if err != nil {
 		return 0, err
 	}
 
-	itemValue := getItemValue(&item)
+	itemValue := getItemValue(item)
 	if itemValue == nil {
 		return 0, ErrNotFound
 	}
 
 	if dst == nil {
-		return item.Counter(), nil
+		return item.Version(), nil
 	}
 
 	if t.keyToCompressed != nil {
-		return item.Counter(), msgpack.UnmarshalCompressed(t.cToKey,
+		return item.Version(), msgpack.UnmarshalCompressed(t.cToKey,
 			itemValue, dst)
 	}
 
-	return item.Counter(), msgpack.Unmarshal(itemValue, dst)
+	return item.Version(), msgpack.Unmarshal(itemValue, dst)
 }
 
-// Set sets a value in the table. An optional counter value can be provided
-// to only set the value if the counter value is the same. A counter value
-// of 0 is valid and represents a key that doesn't exist.
+// Set sets a value in the table. An optional transaction can be provided.
 func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
-	var item badger.KVItem
+	var item badger.Item
 	err := t.data.Get([]byte(key), &item)
 	if err != nil {
 		return err
@@ -272,7 +285,7 @@ func (t *Table) updateIndex(key string, old, new []byte) error {
 }
 
 func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
-	var item badger.KVItem
+	var item badger.Item
 
 	for {
 		err := i.index.Get(indexKey, &item)
@@ -332,7 +345,7 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 }
 
 func (i *Index) addToIndex(indexKey []byte, key string) error {
-	var item badger.KVItem
+	var item badger.Item
 
 	for {
 		err := i.index.Get(indexKey, &item)
@@ -394,7 +407,7 @@ func (i *Index) name() string {
 // Delete deletes the key from the table. An optional counter value can be
 // provided to only delete the document if the counter value is the same.
 func (t *Table) Delete(key string, counter ...uint64) error {
-	var item badger.KVItem
+	var item badger.Item
 	err := t.data.Get([]byte(key), &item)
 	if err != nil {
 		return err

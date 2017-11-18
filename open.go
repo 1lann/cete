@@ -29,7 +29,7 @@ type dbConfig struct {
 	Tables []tableConfig
 }
 
-func (d *DB) newKV(names ...Name) (*badger.KV, error) {
+func (d *DB) newKV(names ...Name) (*badger.DB, error) {
 	dir := d.path
 
 	for _, name := range names {
@@ -48,7 +48,7 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 	opts.Dir = dir
 	opts.ValueDir = dir
 
-	kv, err := badger.NewKV(&opts)
+	kv, err := badger.Open(&opts)
 	if err != nil {
 		return nil, err
 	}

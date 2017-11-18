@@ -35,22 +35,32 @@ func (n Name) Hex() string {
 	return hex.EncodeToString([]byte(n))
 }
 
-// Index represents an index of a table.
-type Index struct {
-	index *badger.KV
-	table *Table
+type globalIndex struct {
+	index *badger.DB
+	table *globalTable
 }
 
-// Table represents a table in the database.
-type Table struct {
-	indexes map[Name]*Index
-	data    *badger.KV
+type globalTable struct {
+	indexes map[Name]*globalIndex
+	data    *badger.DB
 	db      *DB
 
 	compressionLock *sync.RWMutex
 	keyToCompressed map[string]string
 	compressedToKey map[string]string
 	nextKey         string
+}
+
+// Table represents a single transaction table.
+type Table struct {
+	*globalTable
+	txn *badger.Txn
+}
+
+// Index represents an index with a table transaction.
+type Index struct {
+	*globalIndex
+	tableTxn *Table
 }
 
 // DB represents the database.
@@ -130,16 +140,9 @@ func valueToBytes(value interface{}) (b []byte) {
 	panic(fmt.Sprintf("cete: unsupported value: %v", value))
 }
 
-func getItemValue(item *badger.KVItem) []byte {
-	result := make(chan []byte, 1)
-	err := item.Value(func(value []byte) error {
-		result <- value
-		return nil
-	})
-	if err != nil {
-		return nil
-	}
-	return <-result
+func getItemValue(item *badger.Item) []byte {
+	value, err := item.Value()
+	return value
 }
 
 // Document represents the value of a document.

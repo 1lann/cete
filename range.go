@@ -12,10 +12,10 @@ import (
 const bufferSize = 100
 
 type bufferEntry struct {
-	key     string
-	data    []byte
-	counter uint64
-	err     error
+	key       string
+	data      []byte
+	timestamp uint64
+	err       error
 }
 
 // Range represents a result with multiple values in it and is usually sorted
@@ -71,9 +71,9 @@ func (r *Range) Decode(dst interface{}) error {
 	return msgpack.Unmarshal(r.lastEntry.data, dst)
 }
 
-// Counter returns the counter of the current item.
-func (r *Range) Counter() uint64 {
-	return r.lastEntry.counter
+// Timestamp returns the timestamp of the current item.
+func (r *Range) Timestamp() uint64 {
+	return r.lastEntry.timestamp
 }
 
 // Key returns the key of the current item.
@@ -162,12 +162,12 @@ func (r *Range) Limit(n int64) *Range {
 		}
 		n--
 
-		return entry.key, entry.data, entry.counter, entry.err
+		return entry.key, entry.data, entry.timestamp, entry.err
 	}, r.Close, r.table)
 }
 
 // Close closes the range. The range will automatically close upon the
-// first encountered error.
+// first entimestamped error.
 func (r *Range) Close() {
 	if atomic.CompareAndSwapInt32(&r.closed, 0, 1) {
 		r.close()
@@ -185,12 +185,12 @@ func newRange(next func() (string, []byte, uint64, error), closer func(),
 
 	go func() {
 		for {
-			key, data, counter, err := r.next()
+			key, data, timestamp, err := r.next()
 			// r.Close before sending to channel to prevent race condition
 			if err != nil {
 				r.Close()
 			}
-			r.buffer <- bufferEntry{key, data, counter, err}
+			r.buffer <- bufferEntry{key, data, timestamp, err}
 			if err != nil {
 				close(r.buffer)
 				return
@@ -259,7 +259,7 @@ func (r *Range) Filter(filter func(doc Document) (bool, error),
 				r.Close()
 			}
 
-			return entry.key, entry.data, entry.counter, entry.err
+			return entry.key, entry.data, entry.timestamp, entry.err
 		}
 	}, r.Close, r.table)
 }
@@ -309,7 +309,7 @@ func filterWorker(filter func(doc Document) (bool, error),
 //
 // You can optionally specify the number of workers to concurrently operate
 // on. By default the number of workers is 10.
-func (r *Range) Do(operation func(key string, counter uint64, doc Document) error,
+func (r *Range) Do(operation func(key string, timestamp uint64, doc Document) error,
 	workers ...int) error {
 
 	numWorkers := 10
@@ -369,7 +369,7 @@ func (r *Range) Do(operation func(key string, counter uint64, doc Document) erro
 	return result
 }
 
-func doWorker(wg *sync.WaitGroup, operation func(key string, counter uint64,
+func doWorker(wg *sync.WaitGroup, operation func(key string, timestamp uint64,
 	doc Document) error, table *Table, inbox chan *bufferEntry,
 	completion chan error) {
 	var entry *bufferEntry
@@ -392,7 +392,7 @@ func doWorker(wg *sync.WaitGroup, operation func(key string, counter uint64,
 			return
 		}
 
-		err = operation(entry.key, entry.counter, Document{
+		err = operation(entry.key, entry.timestamp, Document{
 			data:  entry.data,
 			table: table,
 		})
@@ -423,7 +423,7 @@ func (r *Range) Skip(n int) *Range {
 
 // Count will count the number of elements in the range and consume the values
 // in the range. If it reaches the end of the range, it will return the count
-// with a nil error. If a non-nil error is encountered, it returns the
+// with a nil error. If a non-nil error is entimestamped, it returns the
 // current count and the error.
 func (r *Range) Count() (int64, error) {
 	var count int64
@@ -455,12 +455,12 @@ func (r *Range) Unique() *Range {
 			entry = <-r.buffer
 
 			if entry.err != nil {
-				return entry.key, entry.data, entry.counter, entry.err
+				return entry.key, entry.data, entry.timestamp, entry.err
 			}
 
 			if !seen[entry.key] {
 				seen[entry.key] = true
-				return entry.key, entry.data, entry.counter, entry.err
+				return entry.key, entry.data, entry.timestamp, entry.err
 			}
 		}
 	}, r.Close, r.table)

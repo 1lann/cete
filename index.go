@@ -168,6 +168,10 @@ func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
 		return "", 0, r.Error()
 	}
 
+	if dst == nil {
+		return r.Key(), r.Counter(), nil
+	}
+
 	return r.Key(), r.Counter(), r.Decode(dst)
 }
 

@@ -58,7 +58,7 @@ I don't know if anyone uses Cete, but whatever.
 I've recently made some breaking changes to how `Range` works. It's now a more traditional cursor setup that allows for cleaner concise code, similar to `bufio.Scanner`. Here's an example how you use it:
 
 ```go
-r := r.Table("people").All()
+r := db.Table("people").All()
 for r.Next() {
 	var result Person
 	r.Decode(&result)

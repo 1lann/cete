@@ -131,3 +131,7 @@ For more complex transactions, you'll need to implement your own solution. Altho
 If you're desperate to use transactions with Cete, you can implement your own 2 phase commits.
 
 On the upside, because there is no support for transactions, all read/writes are lockless, making it super fast!
+
+## Sponsoring Cete
+
+I'd appreciate sponsors! See [SPONSORSHIPS](/SPONSORSHIPS.md) for details.

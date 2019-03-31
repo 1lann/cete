@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/1lann/msgpack"
+	"github.com/dgraph-io/badger"
 )
 
 const bufferSize = 100
@@ -25,6 +26,8 @@ type Range struct {
 	next   func() (string, []byte, uint64, error)
 	close  func()
 	closed int32
+	tx     *badger.Txn
+	it     *badger.Iterator
 
 	lastEntry bufferEntry
 
@@ -170,6 +173,12 @@ func (r *Range) Limit(n int64) *Range {
 // first encountered error.
 func (r *Range) Close() {
 	if atomic.CompareAndSwapInt32(&r.closed, 0, 1) {
+		if r.it != nil {
+			r.it.Close()
+		}
+		if r.tx != nil {
+			r.tx.Discard()
+		}
 		r.close()
 	}
 }

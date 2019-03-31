@@ -8,9 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/1lann/badger"
-	"github.com/1lann/badger/options"
 	"github.com/1lann/msgpack"
+	"github.com/dgraph-io/badger"
 )
 
 type indexConfig struct {
@@ -29,7 +28,7 @@ type dbConfig struct {
 	Tables []tableConfig
 }
 
-func (d *DB) newKV(names ...Name) (*badger.KV, error) {
+func (d *DB) newDB(names ...Name) (*badger.DB, error) {
 	dir := d.path
 
 	for _, name := range names {
@@ -48,7 +47,7 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 	opts.Dir = dir
 	opts.ValueDir = dir
 
-	kv, err := badger.NewKV(&opts)
+	kv, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +71,6 @@ func (d *DB) newKV(names ...Name) (*badger.KV, error) {
 // database if the folder does not exist.
 func Open(path string, opts ...badger.Options) (*DB, error) {
 	defaultOpts := badger.DefaultOptions
-	defaultOpts.TableLoadingMode = options.MemoryMap
 
 	db := &DB{
 		path:        path,
@@ -116,7 +114,7 @@ func Open(path string, opts ...badger.Options) (*DB, error) {
 		for _, index := range table.Indexes {
 			idx := &Index{}
 
-			idx.index, err = db.newKV(Name(table.TableName), Name(index.IndexName))
+			idx.index, err = db.newDB(Name(table.TableName), Name(index.IndexName))
 			if err != nil {
 				return nil, errors.New("cete: failed to open " +
 					table.TableName + "/" +
@@ -127,7 +125,7 @@ func Open(path string, opts ...badger.Options) (*DB, error) {
 			tb.indexes[Name(index.IndexName)] = idx
 		}
 
-		tb.data, err = db.newKV(Name(table.TableName))
+		tb.data, err = db.newDB(Name(table.TableName))
 		if err != nil {
 			return nil, errors.New("cete: failed to open " +
 				table.TableName + ": " + err.Error())

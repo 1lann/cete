@@ -1,3 +1,5 @@
+// +build badfiles
+
 package cete
 
 import (

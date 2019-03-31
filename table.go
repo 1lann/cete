@@ -9,8 +9,8 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/1lann/badger"
 	"github.com/1lann/msgpack"
+	"github.com/dgraph-io/badger"
 )
 
 // NewTable creates a new table in the database. You can optionally specify
@@ -37,7 +37,7 @@ func (d *DB) NewTable(name string, keyCompression ...bool) error {
 		}
 	}
 
-	kv, err := d.newKV(Name(name))
+	kv, err := d.newDB(Name(name))
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (d *DB) NewTable(name string, keyCompression ...bool) error {
 		tb.compressionLock = new(sync.RWMutex)
 		tb.keyToCompressed = make(map[string]string)
 		tb.compressedToKey = make(map[string]string)
-		tb.nextKey = "0"
+		tb.nextKey = "A"
 	}
 
 	d.tables[Name(name)] = tb
@@ -111,41 +111,43 @@ func (t *Table) Drop() error {
 // Get retrieves a value from a table with its primary key. dst must either be
 // a pointer or nil if you only want to get the counter or check for existence.
 func (t *Table) Get(key string, dst interface{}) (uint64, error) {
-	var item badger.KVItem
-	err := t.data.Get([]byte(key), &item)
+	item, err := intermediateGet(t.data, []byte(key))
 	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			return 0, ErrNotFound
+		}
+
 		return 0, err
 	}
 
-	itemValue := getItemValue(&item)
+	itemValue := getItemValue(item)
 	if itemValue == nil {
 		return 0, ErrNotFound
 	}
 
 	if dst == nil {
-		return item.Counter(), nil
+		return item.Version(), nil
 	}
 
 	if t.keyToCompressed != nil {
-		return item.Counter(), msgpack.UnmarshalCompressed(t.cToKey,
+		return item.Version(), msgpack.UnmarshalCompressed(t.cToKey,
 			itemValue, dst)
 	}
 
-	return item.Counter(), msgpack.Unmarshal(itemValue, dst)
+	return item.Version(), msgpack.Unmarshal(itemValue, dst)
 }
 
 // Set sets a value in the table. An optional counter value can be provided
 // to only set the value if the counter value is the same. A counter value
 // of 0 is valid and represents a key that doesn't exist.
 func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
-	var item badger.KVItem
-	err := t.data.Get([]byte(key), &item)
-	if err != nil {
+	item, err := intermediateGet(t.data, []byte(key))
+	if err != nil && !(err == badger.ErrKeyNotFound && len(counter) == 0) {
 		return err
 	}
 
 	if len(counter) > 0 {
-		if item.Counter() != counter[0] {
+		if item == nil || item.Version() != counter[0] {
 			return ErrCounterChanged
 		}
 	}
@@ -162,15 +164,15 @@ func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 
 	if len(counter) > 0 {
 		if counter[0] == 0 {
-			err = t.data.SetIfAbsent([]byte(key), data, 0)
+			err = intermediateCAS(t.data, []byte(key), data, 0)
 		} else {
-			err = t.data.CompareAndSet([]byte(key), data, counter[0])
+			err = intermediateCAS(t.data, []byte(key), data, counter[0])
 		}
 	} else {
-		err = t.data.Set([]byte(key), data, 0)
+		err = intermediateSet(t.data, []byte(key), data)
 	}
 
-	if err == badger.ErrCasMismatch || err == badger.ErrKeyExists {
+	if err == ErrCounterChanged || err == badger.ErrConflict {
 		return ErrCounterChanged
 	}
 
@@ -178,7 +180,7 @@ func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 		return err
 	}
 
-	t.updateIndex(key, getItemValue(&item), data)
+	t.updateIndex(key, getItemValue(item), data)
 
 	return nil
 }
@@ -272,15 +274,13 @@ func (t *Table) updateIndex(key string, old, new []byte) error {
 }
 
 func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
-	var item badger.KVItem
-
 	for {
-		err := i.index.Get(indexKey, &item)
+		item, err := intermediateGet(i.index, indexKey)
 		if err != nil {
 			return err
 		}
 
-		itemValue := getItemValue(&item)
+		itemValue := getItemValue(item)
 		if itemValue == nil {
 			log.Println("cete: warning: corrupt index detected:", i.name())
 			return nil
@@ -309,8 +309,8 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 		}
 
 		if len(list) == 0 {
-			err = i.index.CompareAndDelete(indexKey, item.Counter())
-			if err == badger.ErrCasMismatch {
+			err = intermediateCAD(i.index, indexKey, item.Version())
+			if err == ErrCounterChanged {
 				continue
 			}
 
@@ -322,8 +322,8 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 			log.Fatal("cete: marshal should never fail: ", err)
 		}
 
-		err = i.index.CompareAndSet(indexKey, data, item.Counter())
-		if err == badger.ErrCasMismatch {
+		err = intermediateCAS(i.index, indexKey, data, item.Version())
+		if err == ErrCounterChanged {
 			continue
 		}
 
@@ -332,17 +332,17 @@ func (i *Index) deleteFromIndex(indexKey []byte, key string) error {
 }
 
 func (i *Index) addToIndex(indexKey []byte, key string) error {
-	var item badger.KVItem
-
 	for {
-		err := i.index.Get(indexKey, &item)
-		if err != nil {
+		item, err := intermediateGet(i.index, indexKey)
+		if err != nil && err != badger.ErrKeyNotFound {
 			return err
 		}
 
+		err = nil
+
 		var list []string
 
-		itemValue := getItemValue(&item)
+		itemValue := getItemValue(item)
 		if itemValue != nil {
 			err = msgpack.Unmarshal(itemValue, &list)
 			if err != nil {
@@ -366,13 +366,13 @@ func (i *Index) addToIndex(indexKey []byte, key string) error {
 		}
 
 		if itemValue == nil {
-			err = i.index.SetIfAbsent(indexKey, data, 0)
-			if err == badger.ErrKeyExists {
+			err = intermediateCAS(i.index, indexKey, data, 0)
+			if err == ErrCounterChanged {
 				continue
 			}
 		} else {
-			err = i.index.CompareAndSet(indexKey, data, item.Counter())
-			if err == badger.ErrCasMismatch {
+			err = intermediateCAS(i.index, indexKey, data, item.Version())
+			if err == ErrCounterChanged {
 				continue
 			}
 		}
@@ -394,28 +394,31 @@ func (i *Index) name() string {
 // Delete deletes the key from the table. An optional counter value can be
 // provided to only delete the document if the counter value is the same.
 func (t *Table) Delete(key string, counter ...uint64) error {
-	var item badger.KVItem
-	err := t.data.Get([]byte(key), &item)
+	item, err := intermediateGet(t.data, []byte(key))
 	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			return ErrNotFound
+		}
+
 		return err
 	}
 
-	itemValue := getItemValue(&item)
+	itemValue := getItemValue(item)
 	if itemValue == nil {
 		return nil
 	}
 
 	if len(counter) > 0 {
-		if item.Counter() != counter[0] {
+		if item.Version() != counter[0] {
 			return ErrCounterChanged
 		}
 
-		err = t.data.CompareAndDelete([]byte(key), counter[0])
+		err = intermediateCAD(t.data, []byte(key), counter[0])
 	} else {
-		err = t.data.Delete([]byte(key))
+		err = intermediateDelete(t.data, []byte(key))
 	}
 
-	if err == badger.ErrCasMismatch {
+	if err == ErrCounterChanged || err == badger.ErrConflict {
 		return ErrCounterChanged
 	}
 
@@ -520,7 +523,8 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
 	itOpts.Reverse = shouldReverse
-	it := t.data.NewIterator(itOpts)
+	tx := t.data.NewTransaction(false)
+	it := tx.NewIterator(itOpts)
 
 	upperString, upperIsString := upper.(string)
 	_, upperIsBounds := upper.(Bounds)
@@ -557,7 +561,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	var counter uint64
 	var value []byte
 
-	return newRange(func() (string, []byte, uint64, error) {
+	r := newRange(func() (string, []byte, uint64, error) {
 		for it.Valid() {
 			if !shouldReverse && upper != MaxValue &&
 				bytes.Compare(it.Item().Key(), upperBytes) > 0 {
@@ -568,7 +572,7 @@ func (t *Table) Between(lower interface{}, upper interface{},
 			}
 
 			key = string(it.Item().Key())
-			counter = it.Item().Counter()
+			counter = it.Item().Version()
 			itemValue := getItemValue(it.Item())
 			value = make([]byte, len(itemValue))
 			copy(value, itemValue)
@@ -578,6 +582,10 @@ func (t *Table) Between(lower interface{}, upper interface{},
 
 		return "", nil, 0, ErrEndOfRange
 	}, it.Close, t)
+
+	r.tx = tx
+	r.it = it
+	return r
 }
 
 // CountBetween returns the number of documents whose key values are
@@ -591,7 +599,12 @@ func (t *Table) CountBetween(lower, upper interface{}) int64 {
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
 	itOpts.PrefetchValues = false
-	it := t.data.NewIterator(itOpts)
+
+	tx := t.data.NewTransaction(false)
+	defer tx.Discard()
+
+	it := tx.NewIterator(itOpts)
+	defer it.Close()
 
 	upperString, isString := upper.(string)
 	_, isBounds := upper.(Bounds)
@@ -655,15 +668,20 @@ func (t *Table) Indexes() []string {
 func incrementKey(key string) string {
 	byteKey := []byte(key)
 	for i, letter := range byteKey {
-		if letter < '~' {
-			byteKey[i] = letter + 1
+		if letter < 'z' {
+			if letter == 'Z' {
+				byteKey[i] = 'a'
+			} else {
+				byteKey[i] = letter + 1
+			}
+
 			return string(byteKey)
 		}
 
-		byteKey[i] = '0'
+		byteKey[i] = 'A'
 	}
 
-	byteKey = append(byteKey, '0')
+	byteKey = append(byteKey, 'A')
 	return string(byteKey)
 }
 

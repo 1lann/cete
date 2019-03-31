@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/1lann/badger"
 	"github.com/1lann/msgpack"
+	"github.com/dgraph-io/badger"
 )
 
 // Common errors that can be returned
@@ -37,14 +37,14 @@ func (n Name) Hex() string {
 
 // Index represents an index of a table.
 type Index struct {
-	index *badger.KV
+	index *badger.DB
 	table *Table
 }
 
 // Table represents a table in the database.
 type Table struct {
 	indexes map[Name]*Index
-	data    *badger.KV
+	data    *badger.DB
 	db      *DB
 
 	compressionLock *sync.RWMutex
@@ -130,7 +130,11 @@ func valueToBytes(value interface{}) (b []byte) {
 	panic(fmt.Sprintf("cete: unsupported value: %v", value))
 }
 
-func getItemValue(item *badger.KVItem) []byte {
+func getItemValue(item *badger.Item) []byte {
+	if item == nil {
+		return nil
+	}
+
 	result := make(chan []byte, 1)
 	err := item.Value(func(value []byte) error {
 		result <- value
@@ -150,7 +154,7 @@ type Document struct {
 
 // QueryInt returns the int value of a QueryOne assumed to contain an int.
 func (v Document) QueryInt(query string) int {
-	r, ok := v.QueryOne(query).(uint64)
+	r, ok := v.QueryOne(query).(int64)
 	if !ok {
 		return 0
 	}
@@ -160,7 +164,7 @@ func (v Document) QueryInt(query string) int {
 
 // QueryInt64 returns the int64 value of a QueryOne assumed to contain an int64.
 func (v Document) QueryInt64(query string) int64 {
-	r, ok := v.QueryOne(query).(uint64)
+	r, ok := v.QueryOne(query).(int64)
 	if !ok {
 		return 0
 	}
@@ -200,11 +204,11 @@ func (v Document) QueryBytes(query string) []byte {
 
 // QueryTime returns the time.Time value of a QueryOne assumed to contain a time.Time.
 func (v Document) QueryTime(query string) time.Time {
-	t, ok := v.QueryOne(query).([]interface{})
+	t, ok := v.QueryOne(query).(*time.Time)
 	if !ok {
 		return time.Time{}
 	}
-	return time.Unix(int64(t[0].(uint64)), int64(t[1].(uint64)))
+	return *t
 }
 
 // QueryOne returns the first matching value of a msgpack query.

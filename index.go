@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/1lann/badger"
 	"github.com/1lann/msgpack"
+	"github.com/dgraph-io/badger"
 )
 
 // Bounds is the type for variables which represent a bound for Between.
@@ -55,7 +55,7 @@ func (t *Table) NewIndex(name string) error {
 		return ErrNotFound
 	}
 
-	kv, err := t.db.newKV(Name(tableName), Name(name))
+	kv, err := t.db.newDB(Name(tableName), Name(name))
 	if err != nil {
 		t.db.configMutex.Unlock()
 		return err
@@ -177,15 +177,18 @@ func (i *Index) One(key interface{}, dst interface{}) (string, uint64, error) {
 
 // GetAll returns all the matching values as a range for the provided index key.
 func (i *Index) GetAll(key interface{}) *Range {
-	var item badger.KVItem
-	err := i.index.Get(valueToBytes(key), &item)
+	item, err := intermediateGet(i.index, valueToBytes(key))
 	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			err = ErrEndOfRange
+		}
+
 		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, err
 		}, func() {}, nil)
 	}
 
-	itemValue := getItemValue(&item)
+	itemValue := getItemValue(item)
 	if itemValue == nil {
 		return newRange(func() (string, []byte, uint64, error) {
 			return "", nil, 0, ErrEndOfRange
@@ -216,7 +219,6 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 
 	c := 0
 	var value []byte
-	var item badger.KVItem
 
 	return newRange(func() (string, []byte, uint64, error) {
 		for {
@@ -224,12 +226,12 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 				return "", nil, 0, ErrEndOfRange
 			}
 
-			err = i.table.data.Get([]byte(keys[c]), &item)
+			item, err := intermediateGet(i.table.data, []byte(keys[c]))
 			if err != nil {
 				return "", nil, 0, err
 			}
 
-			itemValue := getItemValue(&item)
+			itemValue := getItemValue(item)
 			if itemValue == nil {
 				c++
 				continue
@@ -239,7 +241,7 @@ func (i *Index) getAllValues(indexValue []byte) (*Range, error) {
 			copy(value, itemValue)
 
 			c++
-			return keys[c-1], value, item.Counter(), nil
+			return keys[c-1], value, item.Version(), nil
 		}
 	}, func() {}, i.table), nil
 }
@@ -265,7 +267,8 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
 	itOpts.Reverse = shouldReverse
-	it := i.index.NewIterator(itOpts)
+	tx := i.index.NewTransaction(false)
+	it := tx.NewIterator(itOpts)
 
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)
@@ -286,13 +289,16 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 
 	var lastRange *Range
 
-	return newRange(i.betweenNext(it, lastRange, shouldReverse, lower, upper),
+	r := newRange(i.betweenNext(it, lastRange, shouldReverse, lower, upper),
 		func() {
 			if lastRange != nil {
 				lastRange.Close()
 			}
 			it.Close()
 		}, i.table)
+	r.tx = tx
+	r.it = it
+	return r
 }
 
 // CountBetween returns the number of documents whose index values are
@@ -306,7 +312,11 @@ func (i *Index) CountBetween(lower, upper interface{}) int64 {
 
 	itOpts := badger.DefaultIteratorOptions
 	itOpts.PrefetchSize = prefetchSize
-	it := i.index.NewIterator(itOpts)
+	tx := i.index.NewTransaction(false)
+	defer tx.Discard()
+
+	it := tx.NewIterator(itOpts)
+	defer it.Close()
 
 	upperBytes := valueToBytes(upper)
 	lowerBytes := valueToBytes(lower)

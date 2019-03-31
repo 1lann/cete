@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync/atomic"
 
 	"github.com/1lann/msgpack"
 	"github.com/dgraph-io/badger"
@@ -88,14 +87,7 @@ func (t *Table) NewIndex(name string) error {
 }
 
 func (i *Index) indexValues(name string) error {
-	var total int64
-
 	i.table.Between(MinValue, MaxValue).Do(func(key string, counter uint64, doc Document) error {
-		last := atomic.AddInt64(&total, 1)
-		if last%100000 == 0 {
-			log.Println(last)
-		}
-
 		results, err := i.indexQuery(doc.data, name)
 		if err != nil {
 			return nil
@@ -105,6 +97,7 @@ func (i *Index) indexValues(name string) error {
 			err = i.addToIndex(valueToBytes(result), key)
 			if err != nil {
 				log.Println("cete: index error for index \""+name+"\":", err)
+				break
 			}
 		}
 
@@ -295,9 +288,8 @@ func (i *Index) Between(lower, upper interface{}, reverse ...bool) *Range {
 				lastRange.Close()
 			}
 			it.Close()
+			tx.Discard()
 		}, i.table)
-	r.tx = tx
-	r.it = it
 	return r
 }
 

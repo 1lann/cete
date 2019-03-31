@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 
 	"github.com/1lann/msgpack"
-	"github.com/dgraph-io/badger"
 )
 
 const bufferSize = 100
@@ -26,8 +25,6 @@ type Range struct {
 	next   func() (string, []byte, uint64, error)
 	close  func()
 	closed int32
-	tx     *badger.Txn
-	it     *badger.Iterator
 
 	lastEntry bufferEntry
 
@@ -38,18 +35,21 @@ type Range struct {
 // next item is successfully retrieved.
 func (r *Range) Next() bool {
 	if r.lastEntry.err != nil {
+		r.Close()
 		return false
 	}
 
 	entry, more := <-r.buffer
 	if !more {
 		r.lastEntry.err = ErrEndOfRange
+		r.Close()
 		return false
 	}
 
 	r.lastEntry = entry
 
 	if entry.err != nil {
+		r.Close()
 		return false
 	}
 
@@ -173,12 +173,6 @@ func (r *Range) Limit(n int64) *Range {
 // first encountered error.
 func (r *Range) Close() {
 	if atomic.CompareAndSwapInt32(&r.closed, 0, 1) {
-		if r.it != nil {
-			r.it.Close()
-		}
-		if r.tx != nil {
-			r.tx.Discard()
-		}
 		r.close()
 	}
 }
@@ -195,10 +189,7 @@ func newRange(next func() (string, []byte, uint64, error), closer func(),
 	go func() {
 		for {
 			key, data, counter, err := r.next()
-			// r.Close before sending to channel to prevent race condition
-			if err != nil {
-				r.Close()
-			}
+
 			r.buffer <- bufferEntry{key, data, counter, err}
 			if err != nil {
 				close(r.buffer)

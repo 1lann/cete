@@ -15,7 +15,12 @@ func intermediateSet(db *badger.DB, key, value []byte) error {
 		tx.Discard()
 		return err
 	}
-	return tx.Commit()
+
+	err = tx.Commit()
+	if err == badger.ErrConflict {
+		return ErrCounterChanged
+	}
+	return err
 }
 
 func intermediateCAS(db *badger.DB, key, value []byte, counter uint64) error {
@@ -34,7 +39,11 @@ func intermediateCAS(db *badger.DB, key, value []byte, counter uint64) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err == badger.ErrConflict {
+		return ErrCounterChanged
+	}
+	return err
 }
 
 func intermediateDelete(db *badger.DB, key []byte) error {
@@ -44,7 +53,12 @@ func intermediateDelete(db *badger.DB, key []byte) error {
 		tx.Discard()
 		return err
 	}
-	return tx.Commit()
+
+	err = tx.Commit()
+	if err == badger.ErrConflict {
+		return ErrCounterChanged
+	}
+	return err
 }
 
 func intermediateCAD(db *badger.DB, key []byte, counter uint64) error {
@@ -63,5 +77,9 @@ func intermediateCAD(db *badger.DB, key []byte, counter uint64) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err == badger.ErrConflict {
+		return ErrCounterChanged
+	}
+	return err
 }

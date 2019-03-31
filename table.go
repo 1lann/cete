@@ -172,7 +172,7 @@ func (t *Table) Set(key string, value interface{}, counter ...uint64) error {
 		err = intermediateSet(t.data, []byte(key), data)
 	}
 
-	if err == ErrCounterChanged || err == badger.ErrConflict {
+	if err == ErrCounterChanged {
 		return ErrCounterChanged
 	}
 
@@ -418,7 +418,7 @@ func (t *Table) Delete(key string, counter ...uint64) error {
 		err = intermediateDelete(t.data, []byte(key))
 	}
 
-	if err == ErrCounterChanged || err == badger.ErrConflict {
+	if err == ErrCounterChanged {
 		return ErrCounterChanged
 	}
 
@@ -560,8 +560,12 @@ func (t *Table) Between(lower interface{}, upper interface{},
 	var key string
 	var counter uint64
 	var value []byte
+	itMutex := new(sync.Mutex)
 
 	r := newRange(func() (string, []byte, uint64, error) {
+		itMutex.Lock()
+		defer itMutex.Unlock()
+
 		for it.Valid() {
 			if !shouldReverse && upper != MaxValue &&
 				bytes.Compare(it.Item().Key(), upperBytes) > 0 {
@@ -581,10 +585,12 @@ func (t *Table) Between(lower interface{}, upper interface{},
 		}
 
 		return "", nil, 0, ErrEndOfRange
-	}, it.Close, t)
-
-	r.tx = tx
-	r.it = it
+	}, func() {
+		itMutex.Lock()
+		it.Close()
+		itMutex.Unlock()
+		tx.Discard()
+	}, t)
 	return r
 }
 

@@ -15,5 +15,3 @@ require (
 	golang.org/x/net v0.0.0-20190328230028-74de082e2cca // indirect
 	golang.org/x/sys v0.0.0-20190329044733-9eb1bfa1ce65 // indirect
 )
-
-replace github.com/1lann/msgpack => ../msgpack

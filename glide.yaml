@@ -1,0 +1,6 @@
+package: github.com/1lann/cete
+import:
+- package: github.com/1lann/msgpack
+  version: fdd7618
+- package: github.com/dgraph-io/badger
+  version: v2.0.0-rc.2+incompatible

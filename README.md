@@ -4,6 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/1lann/cete?status.svg)](https://godoc.org/github.com/1lann/cete)
 [![codecov](https://codecov.io/gh/1lann/cete/branch/master/graph/badge.svg)](https://codecov.io/gh/1lann/cete)
 [![Travis CI](https://travis-ci.org/1lann/cete.svg?branch=master)](https://travis-ci.org/1lann/cete)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F1lann%2Fcete.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2F1lann%2Fcete?ref=badge_shield)
 
 >**Cete**
 >_noun_
@@ -135,3 +136,7 @@ On the upside, because there is no support for transactions, all read/writes are
 ## Sponsoring Cete
 
 I'd appreciate sponsors! See [SPONSORSHIPS](/SPONSORSHIPS.md) for details.
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2F1lann%2Fcete.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2F1lann%2Fcete?ref=badge_large)

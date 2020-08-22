@@ -134,4 +134,6 @@ On the upside, because there is no support for transactions, all read/writes are
 
 # Sponsered by
 
-<img alt="Offscale.io" target="_blank" src="https://i.1l.hn/LqQ7ON.png" width="200px"/>
+<a target="_blank" href="https://offscale.io/">
+	<img alt="Offscale.io" src="https://i.1l.hn/LqQ7ON.png" width="200px"/>
+</a>

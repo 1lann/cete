@@ -132,6 +132,6 @@ If you're desperate to use transactions with Cete, you can implement your own 2 
 
 On the upside, because there is no support for transactions, all read/writes are lockless, making it super fast!
 
-## Sponsoring Cete
+# Sponsered by
 
-I'd appreciate sponsors! See [SPONSORSHIPS](/SPONSORSHIPS.md) for details.
+<img alt="Offscale.io" target="_blank" src="https://i.1l.hn/LqQ7ON.png" width="200px"/>

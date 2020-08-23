@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync/atomic"
 
 	"github.com/1lann/badger"
 	"github.com/1lann/msgpack"
@@ -88,14 +87,7 @@ func (t *Table) NewIndex(name string) error {
 }
 
 func (i *Index) indexValues(name string) error {
-	var total int64
-
 	i.table.Between(MinValue, MaxValue).Do(func(key string, counter uint64, doc Document) error {
-		last := atomic.AddInt64(&total, 1)
-		if last%100000 == 0 {
-			log.Println(last)
-		}
-
 		results, err := i.indexQuery(doc.data, name)
 		if err != nil {
 			return nil
